@@ -25,8 +25,14 @@ android {
         create("release") {
             // Retrieve keystore path and alias from gradle.properties
             // Android Studio will prompt for passwords when generating signed builds.
-            storeFile = file(project.properties["CLEANSWEEP_RELEASE_STORE_FILE"] as String)
-            keyAlias = project.properties["CLEANSWEEP_RELEASE_KEY_ALIAS"] as String
+            val storeFilePath = project.properties["CLEANSWEEP_RELEASE_STORE_FILE"] as? String
+            val keyAliasValue = project.properties["CLEANSWEEP_RELEASE_KEY_ALIAS"] as? String
+            if (storeFilePath != null) {
+                storeFile = file(storeFilePath)
+            }
+            if (keyAliasValue != null) {
+                keyAlias = keyAliasValue
+            }
         }
     }
 
