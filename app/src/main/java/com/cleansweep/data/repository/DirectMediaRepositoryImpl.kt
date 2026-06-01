@@ -75,7 +75,6 @@ class DirectMediaRepositoryImpl @Inject constructor(
     private val dimensionlogTag ="ImageDimensionDebug"
 
     private var folderDetailsCache: List<FolderDetails>? = null
-    private var lastFileDiscoveryCache: List<File>? = null
 
     @Volatile
     private var lastKnownFolderState: Set<String>? = null
@@ -188,7 +187,7 @@ class DirectMediaRepositoryImpl @Inject constructor(
                 _isPerformingBackgroundRefresh.value = true
 
                 // --- SCAN ---
-                val (mediaFolderDetails, _) = performSinglePassFileSystemScan()
+                val mediaFolderDetails = performSinglePassFileSystemScan()
                 val targetFolders = findViableTargetFolders()
                 val newMediaFolderCacheEntries = mediaFolderDetails.map { it.toFolderDetailsCache() }
                 val newTargetFolderCacheEntries = targetFolders.map { (path, name) ->
@@ -227,7 +226,6 @@ class DirectMediaRepositoryImpl @Inject constructor(
 
     private fun invalidateCaches() {
         folderDetailsCache = null
-        lastFileDiscoveryCache = null // Invalidate file discovery cache
         externalScope.launch {
             folderDetailsDao.clear()
         }
@@ -809,10 +807,9 @@ class DirectMediaRepositoryImpl @Inject constructor(
      * This now uses the atomic replaceAll to prevent flicker.
      */
     private suspend fun scanAndCacheMediaFolders(): List<FolderDetails> = withContext(Dispatchers.IO) {
-        val (finalDetailsList, discoveredFiles) = performSinglePassFileSystemScan()
+        val finalDetailsList = performSinglePassFileSystemScan()
         Log.d("CacheDebug", "Scan Stage 1 (Media) complete. Found ${finalDetailsList.size} folders.")
 
-        lastFileDiscoveryCache = discoveredFiles
         folderDetailsCache = finalDetailsList
 
         // The atomic replaceAll in the DAO prevents flicker. If no folders are found,
@@ -887,23 +884,27 @@ class DirectMediaRepositoryImpl @Inject constructor(
     /**
      * Performs a highly efficient, single-pass scan of the file system to discover all media
      * folders and calculate their details simultaneously.
-     *
-     * @return A Pair containing the list of discovered [FolderDetails] and a flat list of all [File] objects found.
      */
-    private suspend fun performSinglePassFileSystemScan(): Pair<List<FolderDetails>, List<File>> = withContext(Dispatchers.IO) {
+    private suspend fun performSinglePassFileSystemScan(): List<FolderDetails> = withContext(Dispatchers.IO) {
         val processedPaths = preferencesRepository.processedMediaPathsFlow.first()
         val permanentlySortedFolders = preferencesRepository.permanentlySortedFoldersFlow.first()
         val standardSystemDirectoryPaths = getStandardSystemDirectoryPaths()
         val primarySystemPaths = getPrimarySystemDirectoryPaths()
 
-        // Map: Folder Path -> Pair(Mutable List of Files, isMediaFolder)
-        val folderContents = mutableMapOf<String, Pair<MutableList<File>, Boolean>>()
-        val allDiscoveredFiles = mutableListOf<File>()
+        data class FolderAggregate(
+            val path: String,
+            val name: String,
+            var itemCount: Int = 0,
+            var totalSize: Long = 0L,
+            var containsMedia: Boolean = false
+        )
+
+        val folderAggregates = mutableMapOf<String, FolderAggregate>()
         val queue: Queue<File> = ArrayDeque()
 
         Environment.getExternalStorageDirectory()?.let { queue.add(it) }
 
-        // Phase 1: Discover all files and categorize them by parent folder in a single traversal.
+        // Discover folders in a single traversal while only retaining aggregate stats.
         while (queue.isNotEmpty()) {
             currentCoroutineContext().ensureActive()
             val directory = queue.poll() ?: continue
@@ -920,14 +921,29 @@ class DirectMediaRepositoryImpl @Inject constructor(
                 for (file in files) {
                     if (file.isDirectory) {
                         queue.add(file)
-                    } else {
-                        val parentPath = file.parent ?: continue
-                        val entry = folderContents.getOrPut(parentPath) { Pair(mutableListOf(), false) }
-                        entry.first.add(file)
-                        // If we find even one media file, mark the folder as a media folder.
-                        if (!entry.second && isMediaFile(file)) {
-                            folderContents[parentPath] = entry.copy(second = true)
-                        }
+                        continue
+                    }
+
+                    if (!isMediaFile(file)) {
+                        continue
+                    }
+
+                    val parentPath = file.parent ?: continue
+                    if (parentPath in permanentlySortedFolders) {
+                        continue
+                    }
+
+                    val aggregate = folderAggregates.getOrPut(parentPath) {
+                        FolderAggregate(
+                            path = parentPath,
+                            name = File(parentPath).name
+                        )
+                    }
+                    aggregate.containsMedia = true
+
+                    if (file.absolutePath !in processedPaths) {
+                        aggregate.itemCount++
+                        aggregate.totalSize += file.length()
                     }
                 }
             } catch (e: Exception) {
@@ -935,43 +951,25 @@ class DirectMediaRepositoryImpl @Inject constructor(
             }
         }
 
-        // Phase 2: Process the collected data into FolderDetails, filtering and calculating stats.
-        val folderDetailsList = mutableListOf<FolderDetails>()
-        folderContents.entries
-            .filter { it.value.second } // Only process folders that were marked as containing media.
-            .forEach { (folderPath, content) ->
-                if (folderPath in permanentlySortedFolders) return@forEach // Skip permanently sorted folders.
+        return@withContext folderAggregates.values
+            .asSequence()
+            .filter { it.containsMedia && it.itemCount > 0 }
+            .map { aggregate ->
+                val folderFile = File(aggregate.path)
+                val isSystem = aggregate.path in standardSystemDirectoryPaths ||
+                    isConventionalSystemChildFolder(folderFile, standardSystemDirectoryPaths)
+                val isPrimarySystem = aggregate.path in primarySystemPaths
 
-                val folderFile = File(folderPath)
-                var itemCount = 0
-                var totalSize = 0L
-
-                content.first.forEach { file ->
-                    if (isMediaFile(file)) {
-                        allDiscoveredFiles.add(file)
-                        if (file.absolutePath !in processedPaths) {
-                            itemCount++
-                            totalSize += file.length()
-                        }
-                    }
-                }
-
-                if (itemCount > 0) {
-                    val isSystem = folderPath in standardSystemDirectoryPaths || isConventionalSystemChildFolder(folderFile, standardSystemDirectoryPaths)
-                    val isPrimarySystem = folderPath in primarySystemPaths
-                    folderDetailsList.add(
-                        FolderDetails(
-                            path = folderPath,
-                            name = folderFile.name,
-                            itemCount = itemCount,
-                            totalSize = totalSize,
-                            isSystemFolder = isSystem,
-                            isPrimarySystemFolder = isPrimarySystem
-                        )
-                    )
-                }
+                FolderDetails(
+                    path = aggregate.path,
+                    name = aggregate.name,
+                    itemCount = aggregate.itemCount,
+                    totalSize = aggregate.totalSize,
+                    isSystemFolder = isSystem,
+                    isPrimarySystemFolder = isPrimarySystem
+                )
             }
-        return@withContext Pair(folderDetailsList, allDiscoveredFiles)
+            .toList()
     }
 
     override suspend fun handleFolderRename(oldPath: String, newPath: String) = withContext(Dispatchers.IO) {
