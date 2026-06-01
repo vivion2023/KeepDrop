@@ -670,16 +670,94 @@ class SwiperViewModel @Inject constructor(
         }
     }
 
-    fun handleSwipeLeft() {
-        val currentItem = _uiState.value.currentItem ?: return
-        val change = PendingChange(currentItem, if (_invertSwipe) SwiperAction.Keep(currentItem) else SwiperAction.Delete(currentItem))
-        processAndAdvance(change)
+    private fun isBrowsableItem(itemId: String, state: SwiperUiState): Boolean {
+        val blockedIds = sessionProcessedMediaIds +
+            (if (_rememberProcessedMediaEnabled) processedMediaIds else emptySet()) +
+            state.pendingChanges.map { it.item.id }.toSet() +
+            state.sessionSkippedMediaIds
+
+        return itemId == state.currentItem?.id || itemId !in blockedIds
     }
 
-    fun handleSwipeRight() {
+    private fun getAdjacentBrowsableItems(direction: Int, limit: Int): List<MediaItem> {
+        if (direction == 0 || limit <= 0) return emptyList()
+
+        val currentState = _uiState.value
+        currentState.currentItem ?: return emptyList()
+
+        val searchRange = if (direction > 0) {
+            (currentState.currentIndex + 1)..<currentState.allMediaItems.size
+        } else {
+            (currentState.currentIndex - 1) downTo 0
+        }
+
+        return searchRange
+            .mapNotNull { index -> currentState.allMediaItems.getOrNull(index) }
+            .filter { candidate -> isBrowsableItem(candidate.id, currentState) }
+            .take(limit)
+    }
+
+    fun getPreviousBrowsableItem(): MediaItem? {
+        return getAdjacentBrowsableItems(direction = -1, limit = 1).firstOrNull()
+    }
+
+    fun getUpcomingBrowsableItems(limit: Int): List<MediaItem> {
+        return getAdjacentBrowsableItems(direction = 1, limit = limit)
+    }
+
+    private fun navigateToAdjacentItem(direction: Int): Boolean {
+        if (direction == 0) return false
+
+        var navigated = false
+
+        _uiState.update { currentState ->
+            currentState.currentItem ?: return@update currentState
+
+            val searchRange = if (direction > 0) {
+                (currentState.currentIndex + 1)..<currentState.allMediaItems.size
+            } else {
+                (currentState.currentIndex - 1) downTo 0
+            }
+
+            val targetIndex = searchRange.firstOrNull { index ->
+                currentState.allMediaItems
+                    .getOrNull(index)
+                    ?.let { candidate -> isBrowsableItem(candidate.id, currentState) } == true
+            } ?: return@update currentState
+
+            navigated = true
+
+            currentState.copy(
+                currentIndex = targetIndex,
+                currentItem = currentState.allMediaItems[targetIndex],
+                isSortingComplete = false,
+                showSummarySheet = false,
+                videoPlaybackPosition = 0L,
+                videoPlaybackSpeed = _defaultVideoSpeed,
+                isVideoMuted = true,
+                isCurrentItemPendingConversion = false
+            )
+        }
+
+        return navigated
+    }
+
+    fun handleSwipeLeft(): Boolean {
+        return navigateToAdjacentItem(direction = 1)
+    }
+
+    fun handleSwipeRight(): Boolean {
+        return navigateToAdjacentItem(direction = -1)
+    }
+
+    fun handleKeep() {
         val currentItem = _uiState.value.currentItem ?: return
-        val change = PendingChange(currentItem, if (_invertSwipe) SwiperAction.Delete(currentItem) else SwiperAction.Keep(currentItem))
-        processAndAdvance(change)
+        processAndAdvance(PendingChange(currentItem, SwiperAction.Keep(currentItem)))
+    }
+
+    fun handleDelete() {
+        val currentItem = _uiState.value.currentItem ?: return
+        processAndAdvance(PendingChange(currentItem, SwiperAction.Delete(currentItem)))
     }
 
     fun handleSwipeDown() {
