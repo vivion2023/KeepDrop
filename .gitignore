@@ -20,6 +20,7 @@ output-metadata.json
 *.iml
 .idea/
 .kotlin/
+.vscode/
 misc.xml
 deploymentTargetDropDown.xml
 render.experimental.xml
