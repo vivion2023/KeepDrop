@@ -26,11 +26,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
+import com.cleansweep.R
 import com.cleansweep.ui.navigation.AppNavigation
 import com.cleansweep.ui.navigation.Screen
 import com.cleansweep.util.PermissionManager
@@ -130,7 +132,7 @@ fun PermissionRequiredScreen() {
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "All Files Access Required",
+            text = stringResource(R.string.permission_screen_title),
             style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Center
         )
@@ -138,7 +140,7 @@ fun PermissionRequiredScreen() {
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "CleanSweep needs All Files Access permission to organize your photos and videos across all folders on your device. This permission was requested during onboarding.",
+            text = stringResource(R.string.permission_screen_desc_onboarding),
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center
         )
@@ -146,7 +148,7 @@ fun PermissionRequiredScreen() {
         Spacer(modifier = Modifier.height(32.dp))
 
         Text(
-            text = "Please grant the permission in your device settings to continue using CleanSweep.",
+            text = stringResource(R.string.permission_screen_continue_instruction),
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
@@ -169,7 +171,7 @@ fun PermissionRequiredScreen() {
             },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Open Settings")
+            Text(stringResource(R.string.open_settings))
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -178,16 +180,16 @@ fun PermissionRequiredScreen() {
             onClick = { showCloseDialog = true },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Close App")
+            Text(stringResource(R.string.close_app))
         }
     }
 
     if (showCloseDialog) {
         AlertDialog(
             onDismissRequest = { showCloseDialog = false },
-            title = { Text("Close CleanSweep") },
+            title = { Text(stringResource(R.string.onboarding_close_dialog_title)) },
             text = {
-                Text("CleanSweep cannot function without All Files Access permission. We tried to, but it ended up being required for CleanSweep to work properly for most users.")
+                Text(stringResource(R.string.onboarding_close_dialog_body))
             },
             confirmButton = {
                 Button(
@@ -195,7 +197,7 @@ fun PermissionRequiredScreen() {
                         (context as? androidx.activity.ComponentActivity)?.finish()
                     }
                 ) {
-                    Text("Close")
+                    Text(stringResource(R.string.close))
                 }
             },
             dismissButton = {
@@ -204,7 +206,7 @@ fun PermissionRequiredScreen() {
                         showCloseDialog = false
                     }
                 ) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )

@@ -37,9 +37,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.cleansweep.R
 import com.cleansweep.ui.theme.AppTheme
 import com.cleansweep.ui.theme.LocalAppTheme
 
@@ -112,7 +114,7 @@ fun AppDialog(
                                     .offset(x = (4).dp)
                             )
                             Text(
-                                text = "Don't ask again",
+                                text = stringResource(R.string.do_not_ask_again),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }

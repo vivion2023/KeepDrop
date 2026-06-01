@@ -35,11 +35,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.cleansweep.R
 import com.cleansweep.ui.theme.AppTheme
 import com.cleansweep.ui.theme.LocalAppTheme
 
@@ -178,7 +180,7 @@ fun FolderSearchDialog(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = "No folders found.",
+                                        text = stringResource(R.string.no_folders_found),
                                         style = MaterialTheme.typography.bodySmall,
                                     )
                                 }
@@ -190,7 +192,7 @@ fun FolderSearchDialog(
                     if (displayedPath != null) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
                         Text(
-                            text = "Selected: .../${displayedPath.takeLast(35)}",
+                            text = stringResource(R.string.selected_path_format, ".../${displayedPath.takeLast(35)}"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier
@@ -207,7 +209,7 @@ fun FolderSearchDialog(
                     modifier = Modifier.align(Alignment.End),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
                     if (!autoConfirmOnSelection) {
                         Button(
                             onClick = onConfirm,

@@ -44,7 +44,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.cleansweep.R
 import com.cleansweep.ui.components.FastScrollbar
 import com.mikepenz.aboutlibraries.entity.Library
 import com.mikepenz.aboutlibraries.ui.compose.LibrariesContainer
@@ -74,7 +76,7 @@ fun OpenSourceLicensesScreen(onNavigateUp: () -> Unit) {
                     val licenseContent = library.licenses.firstOrNull()?.licenseContent
                     Text(
                         text = if (licenseContent.isNullOrBlank()) {
-                            "License content not found. Please check the library's website for more information."
+                            stringResource(R.string.license_content_not_found)
                         } else {
                             licenseContent
                         }
@@ -83,7 +85,7 @@ fun OpenSourceLicensesScreen(onNavigateUp: () -> Unit) {
             },
             confirmButton = {
                 TextButton(onClick = { selectedLibrary = null }) {
-                    Text("OK")
+                    Text(stringResource(R.string.ok))
                 }
             }
         )
@@ -92,12 +94,12 @@ fun OpenSourceLicensesScreen(onNavigateUp: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Open-Source Licenses") },
+                title = { Text(stringResource(R.string.open_source_licenses_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateUp) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Navigate back"
+                            contentDescription = stringResource(R.string.navigate_back)
                         )
                     }
                 },

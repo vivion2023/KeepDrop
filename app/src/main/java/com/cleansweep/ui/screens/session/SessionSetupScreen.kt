@@ -768,13 +768,13 @@ private fun EnhancedFolderItem(
             Box {
                 Icon(
                     imageVector = Icons.Default.Folder,
-                    contentDescription = "Folder",
+                    contentDescription = stringResource(R.string.folder),
                     modifier = Modifier.size(24.dp),
                     tint = MaterialTheme.colorScheme.primary
                 )
                 if (folder.isPrimarySystemFolder) {
                     Text(
-                        text = "S",
+                        text = stringResource(R.string.system_folder_badge),
                         color = MaterialTheme.colorScheme.onPrimary,
                         fontSize = 5.sp,
                         fontWeight = FontWeight.Bold,

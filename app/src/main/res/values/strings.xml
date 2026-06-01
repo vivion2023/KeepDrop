@@ -40,6 +40,7 @@
     <string name="open_full_screen">Open full-screen</string>
     <string name="share">Share</string>
     <string name="rename">Rename</string>
+    <string name="folder">Folder</string>
     <string name="select_all">Select All</string>
     <string name="unselect_all">Unselect All</string>
     <string name="loading">Loading…</string>
@@ -77,6 +78,7 @@
     <string name="no_media_folders_found">No media folders found</string>
     <string name="no_media_folders_desc">This can happen on a new device. Try adding some photos or videos, or pull down to re-scan.</string>
     <string name="no_results_found">No results found</string>
+    <string name="no_folders_found">No folders found.</string>
     <string name="no_search_results_desc">Your search for \"%1$s\" did not match any folder names.</string>
     <string name="find_duplicates">Find Duplicates</string>
     <string name="scanning_progress_title">Scanning for Duplicates</string>
@@ -120,6 +122,7 @@
     <string name="deselect_subfolders">Deselect sub-folders</string>
     <string name="favorite">Favorite</string>
     <string name="unfavorite">Unfavorite</string>
+    <string name="system_folder_badge">S</string>
 
     <!-- Swiper Screen -->
     <string name="unsaved_changes_title">Unsaved Changes</string>
@@ -134,6 +137,16 @@
     <string name="reset_all_sorted_media">Reset All Sorted Media</string>
     <string name="close_app">Close App</string>
     <string name="add_target_folder">Add Target Folder</string>
+    <string name="add_folder_search_path">Search or Enter Path</string>
+    <string name="selected_path_format">Selected: %1$s</string>
+    <string name="new_folder_name_optional">New Folder Name (optional)</string>
+    <string name="leave_blank_import_folder">Leave blank to import folder</string>
+    <string name="folder_exists_hint">A folder with this name already exists: %1$s</string>
+    <string name="similar_folder_exists_hint">A folder with a similar name exists: %1$s</string>
+    <string name="add_to_target_favorites">Add to Target Favorites</string>
+    <string name="import_folder">Import</string>
+    <string name="create_and_move">Create &amp; Move</string>
+    <string name="import_and_move">Import &amp; Move</string>
     <string name="skip_item">Skip Item</string>
     <string name="undo_last_action">Undo Last Action</string>
     <string name="expand">Expand</string>
@@ -280,6 +293,7 @@
     <string name="selection_state">Selection State</string>
     <string name="primary_image_desc">Primary image for group</string>
     <string name="video">Video</string>
+    <string name="remove_folder">Remove folder</string>
     <string name="reclaim_space_format">Reclaim Space: %1$s</string>
     <string name="files_selected_format">%1$s selected</string>
     <string name="algorithm_corrected_toast">Algorithm corrected. These items won\'t be grouped again.</string>
@@ -288,10 +302,13 @@
     <string name="scan_already_in_progress">A scan is already in progress.</string>
     <string name="select_one_scan_type">Please select at least one scan type.</string>
     <string name="scan_cancelled_toast">Scan cancelled</string>
+    <string name="scan_cancelled_title">Scan Cancelled</string>
+    <string name="scan_cancelled_notification_text">The duplicate scan was cancelled.</string>
     <string name="scan_complete_selection_cleared">Scan complete. Selections have been cleared.</string>
     <string name="no_valid_cache_toast">Could not find any valid cached results.</string>
     <string name="no_exact_duplicates_toast">No exact duplicates found.</string>
     <string name="no_duplicates_to_delete_toast">No duplicates found to delete.</string>
+    <string name="no_duplicates_found_notification">No duplicates found.</string>
     <string name="sorted_media_reset_toast">Sorted media history has been reset.</string>
     <string name="info_icon_desc">Information</string>
 
@@ -336,7 +353,9 @@
     <string name="onboarding_close_dialog_body">CleanSweep cannot function without All Files Access permission. We tried to but it ended up being required for CleanSweep to work properly for most users.</string>
     <string name="permission_screen_title">All Files Access Required</string>
     <string name="permission_screen_desc">CleanSweep needs All Files Access permission to organize your photos and videos across all folders on your device.</string>
+    <string name="permission_screen_desc_onboarding">CleanSweep needs All Files Access permission to organize your photos and videos across all folders on your device. This permission was requested during onboarding.</string>
     <string name="permission_screen_instruction">Please grant the permission in your device settings to use CleanSweep.</string>
+    <string name="permission_screen_continue_instruction">Please grant the permission in your device settings to continue using CleanSweep.</string>
     <string name="open_settings">Open Settings</string>
 
     <!-- Onboarding Pages -->
@@ -371,6 +390,7 @@
     <string name="language_system">System Default</string>
     <string name="language_english">English</string>
     <string name="language_italian">Italiano</string>
+    <string name="language_chinese_simplified">中文</string>
 
     <!-- Theme Settings -->
     <string name="theme_title">Theme</string>
@@ -569,6 +589,7 @@
     <string name="target_favs_cleared">Target folder favorites cleared.</string>
     <string name="full_device_scan_complete">Full device scan completed.</string>
     <string name="scan_failed_interrupted">Scan failed or was interrupted.</string>
+    <string name="scan_failed_title">Scan Failed</string>
 
     <!-- Advanced Dialogs -->
     <string name="some_folders_not_found_title">Some Folders Not Found</string>
@@ -583,6 +604,9 @@
     <string name="reset_target_favs_body">Are you sure you want to clear all target folder favorites? This action cannot be undone.</string>
     <string name="no_folders_added_to_list">No folders have been added to this list. The scan will run as if this setting were disabled.</string>
     <string name="add_folder">Add Folder</string>
+    <string name="rename_folder_title">Rename Folder</string>
+    <string name="renaming_folder_format">Renaming: %1$s</string>
+    <string name="new_folder_name">New folder name</string>
     <string name="unindexed_files_dialog_title">Unindexed Media Files</string>
     <string name="unindexed_files_ideal_state">No unindexed user files found. This is the ideal state. Any remaining files are likely hidden system or temporary files, which can be viewed with the toggle below.</string>
     <string name="no_unindexed_files_found">No unindexed files were found on your device.</string>
@@ -604,5 +628,30 @@
     <string name="address_copied">Address copied</string>
     <string name="copy_address_icon_desc">Copy Address</string>
     <string name="funding_dialog_footer">Feel free to include your GitHub username in the transaction description!</string>
+
+    <!-- Open-Source Licenses -->
+    <string name="license_content_not_found">License content not found. Please check the library website for more information.</string>
+
+    <!-- Duplicate Scan Notifications -->
+    <plurals name="removed_missing_scan_scope_folders">
+        <item quantity="one">Removed 1 non-existent folder from scan scope settings.</item>
+        <item quantity="other">Removed %1$d non-existent folders from scan scope settings.</item>
+    </plurals>
+    <plurals name="notification_exact_groups">
+        <item quantity="one">Exact Duplicates: 1 group</item>
+        <item quantity="other">Exact Duplicates: %1$d groups</item>
+    </plurals>
+    <plurals name="notification_similar_groups">
+        <item quantity="one">Similar Media: 1 group</item>
+        <item quantity="other">Similar Media: %1$d groups</item>
+    </plurals>
+    <plurals name="notification_skipped_unreadable_files">
+        <item quantity="one">Skipped: 1 unreadable file</item>
+        <item quantity="other">Skipped: %1$d unreadable files</item>
+    </plurals>
+    <string name="duplicate_scan_progress_channel_name">Duplicate Scan Progress</string>
+    <string name="duplicate_scan_progress_channel_desc">Shows the progress of the duplicate files scan.</string>
+    <string name="duplicate_scan_results_channel_name">Duplicate Scan Results</string>
+    <string name="duplicate_scan_results_channel_desc">Shows the final result of the duplicate files scan.</string>
 
 </resources>

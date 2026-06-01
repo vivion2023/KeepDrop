@@ -296,7 +296,7 @@ fun SettingsScreen(
                 SettingSection(
                     titleRes = R.string.appearance_section_title,
                     items = listOf(
-                        SettingContent(titleRes = R.string.language_title, keywords = listOf("translation", "it", "en")) {
+                        SettingContent(titleRes = R.string.language_title, keywords = listOf("translation", "language", "it", "en", "zh", "chinese", "中文", "语言")) {
                             ExposedDropdownMenu(
                                 titleRes = R.string.language_title,
                                 descriptionRes = R.string.language_desc,
@@ -1065,7 +1065,7 @@ private fun DuplicateScanScopeManagementDialog(
                                 modifier = Modifier.weight(1f)
                             )
                             IconButton(onClick = { onRemoveFolder(path) }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Remove folder")
+                                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.remove_folder))
                             }
                         }
                     }
@@ -1641,6 +1641,7 @@ private fun getAppLocaleDisplayName(locale: AppLocale): String {
         AppLocale.SYSTEM -> stringResource(R.string.language_system)
         AppLocale.ENGLISH -> stringResource(R.string.language_english)
         AppLocale.ITALIAN -> stringResource(R.string.language_italian)
+        AppLocale.CHINESE_SIMPLIFIED -> stringResource(R.string.language_chinese_simplified)
     }
 }
 

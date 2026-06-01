@@ -202,9 +202,12 @@ class DuplicateScanService : LifecycleService() {
             } else {
                 preferencesRepository.setDuplicateScanExcludeList(validPaths)
             }
-            val plural = if (removedCount > 1) "s" else ""
             Handler(Looper.getMainLooper()).post {
-                Toast.makeText(this, "Removed $removedCount non-existent folder$plural from scan scope settings.", Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    this,
+                    resources.getQuantityString(R.plurals.removed_missing_scan_scope_folders, removedCount, removedCount),
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
 
@@ -454,7 +457,7 @@ class DuplicateScanService : LifecycleService() {
             .setOnlyAlertOnce(true)
             .setOngoing(true)
             .setContentIntent(pendingIntent)
-            .addAction(R.drawable.ic_cancel, "Cancel", cancelPendingIntent)
+            .addAction(R.drawable.ic_cancel, getString(R.string.cancel), cancelPendingIntent)
             .build()
     }
 
@@ -477,16 +480,22 @@ class DuplicateScanService : LifecycleService() {
                 val skippedCount = finalState.unscannableFiles.size
                 val summaryLines = mutableListOf<String>()
 
-                if (exactCount > 0) summaryLines.add("Exact Duplicates: $exactCount groups")
-                if (similarCount > 0) summaryLines.add("Similar Media: $similarCount groups")
-                if (skippedCount > 0) summaryLines.add("Skipped: $skippedCount unreadable files")
+                if (exactCount > 0) {
+                    summaryLines.add(resources.getQuantityString(R.plurals.notification_exact_groups, exactCount, exactCount))
+                }
+                if (similarCount > 0) {
+                    summaryLines.add(resources.getQuantityString(R.plurals.notification_similar_groups, similarCount, similarCount))
+                }
+                if (skippedCount > 0) {
+                    summaryLines.add(resources.getQuantityString(R.plurals.notification_skipped_unreadable_files, skippedCount, skippedCount))
+                }
 
                 notificationBuilder
                     .setSmallIcon(R.drawable.ic_duplicates_scan)
                     .setContentTitle(getString(R.string.scan_complete_title))
 
                 if (summaryLines.isEmpty()) {
-                    notificationBuilder.setContentText("No duplicates found.")
+                    notificationBuilder.setContentText(getString(R.string.no_duplicates_found_notification))
                 } else {
                     val inboxStyle = NotificationCompat.InboxStyle()
                         .setBigContentTitle(getString(R.string.scan_complete_title))
@@ -505,14 +514,14 @@ class DuplicateScanService : LifecycleService() {
             BackgroundScanState.Cancelled -> {
                 notificationBuilder
                     .setSmallIcon(R.drawable.ic_duplicates_scan)
-                    .setContentTitle("Scan Cancelled")
-                    .setContentText("The duplicate scan was cancelled.")
+                    .setContentTitle(getString(R.string.scan_cancelled_title))
+                    .setContentText(getString(R.string.scan_cancelled_notification_text))
             }
             BackgroundScanState.Error -> {
                 notificationBuilder
                     .setSmallIcon(R.drawable.ic_duplicates_scan)
-                    .setContentTitle("Scan Failed")
-                    .setContentText(finalState.errorMessage ?: "An unknown error occurred.")
+                    .setContentTitle(getString(R.string.scan_failed_title))
+                    .setContentText(finalState.errorMessage ?: getString(R.string.unknown_error))
             }
             else -> return
         }
@@ -522,18 +531,18 @@ class DuplicateScanService : LifecycleService() {
     private fun createNotificationChannels() {
         val progressChannel = NotificationChannel(
             PROGRESS_CHANNEL_ID,
-            "Duplicate Scan Progress",
+            getString(R.string.duplicate_scan_progress_channel_name),
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = "Shows the progress of the duplicate files scan."
+            description = getString(R.string.duplicate_scan_progress_channel_desc)
             setSound(null, null)
         }
         val resultChannel = NotificationChannel(
             RESULT_CHANNEL_ID,
-            "Duplicate Scan Results",
+            getString(R.string.duplicate_scan_results_channel_name),
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "Shows the final result of the duplicate files scan."
+            description = getString(R.string.duplicate_scan_results_channel_desc)
         }
         notificationManager.createNotificationChannel(progressChannel)
         notificationManager.createNotificationChannel(resultChannel)

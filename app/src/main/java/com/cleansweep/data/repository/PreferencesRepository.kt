@@ -102,7 +102,8 @@ enum class UnselectScanScope {
 enum class AppLocale(val tag: String?) {
     SYSTEM(null),
     ENGLISH("en"),
-    ITALIAN("it")
+    ITALIAN("it"),
+    CHINESE_SIMPLIFIED("zh-CN")
 }
 
 
@@ -181,11 +182,11 @@ class PreferencesRepository @Inject constructor(
 
     val appLocaleFlow: Flow<AppLocale> = context.dataStore.data
         .map { preferences ->
-            val localeName = preferences[PreferencesKeys.APP_LOCALE] ?: AppLocale.SYSTEM.name
+            val localeName = preferences[PreferencesKeys.APP_LOCALE] ?: AppLocale.CHINESE_SIMPLIFIED.name
             try {
                 AppLocale.valueOf(localeName)
             } catch (e: IllegalArgumentException) {
-                AppLocale.SYSTEM
+                AppLocale.CHINESE_SIMPLIFIED
             }
         }
 

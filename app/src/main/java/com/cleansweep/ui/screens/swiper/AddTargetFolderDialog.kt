@@ -36,10 +36,12 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import com.cleansweep.R
 import com.cleansweep.data.repository.AddFolderFocusTarget
 import com.cleansweep.ui.components.AppDialog
 import com.cleansweep.ui.components.FolderSearchState
@@ -185,7 +187,7 @@ fun AddTargetFolderDialog(
                 .widthIn(max = 400.dp)
                 .padding(24.dp)
         ) {
-            Text("Add Target Folder", style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.add_target_folder), style = MaterialTheme.typography.headlineSmall)
             Spacer(modifier = Modifier.height(16.dp))
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -194,7 +196,7 @@ fun AddTargetFolderDialog(
                 OutlinedTextField(
                     value = folderSearchState.searchQuery,
                     onValueChange = onSearchQueryChange,
-                    label = { Text("Search or Enter Path") },
+                    label = { Text(stringResource(R.string.add_folder_search_path)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     modifier = Modifier
@@ -260,7 +262,7 @@ fun AddTargetFolderDialog(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "No folders found.",
+                                    text = stringResource(R.string.no_folders_found),
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                             }
@@ -269,7 +271,7 @@ fun AddTargetFolderDialog(
                     if (folderSearchState.browsePath != null && folderSearchState.searchQuery.isBlank()) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
                         Text(
-                            text = "Selected: .../${folderSearchState.browsePath.takeLast(35)}",
+                            text = stringResource(R.string.selected_path_format, ".../${folderSearchState.browsePath.takeLast(35)}"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier
@@ -283,18 +285,18 @@ fun AddTargetFolderDialog(
                 OutlinedTextField(
                     value = newFolderName,
                     onValueChange = { newFolderName = it },
-                    label = { Text("New Folder Name (optional)") },
-                    placeholder = { Text("Leave blank to import folder") },
+                    label = { Text(stringResource(R.string.new_folder_name_optional)) },
+                    placeholder = { Text(stringResource(R.string.leave_blank_import_folder)) },
                     singleLine = true,
                     supportingText = {
                         when (hintState) {
                             is HintState.ExactMatch -> {
                                 val friendlyPath = ".../${File(hintState.path).parentFile?.name}/${File(hintState.path).name}"
-                                Text("A folder with this name already exists: $friendlyPath")
+                                Text(stringResource(R.string.folder_exists_hint, friendlyPath))
                             }
                             is HintState.SimilarMatch -> {
                                 val friendlyPath = ".../${File(hintState.path).parentFile?.name}/${File(hintState.path).name}"
-                                Text("A folder with a similar name exists: $friendlyPath")
+                                Text(stringResource(R.string.similar_folder_exists_hint, friendlyPath))
                             }
                             HintState.None -> { /* No text */ }
                         }
@@ -339,7 +341,7 @@ fun AddTargetFolderDialog(
                         onCheckedChange = { addToFavorites = it },
                         enabled = isFavoritesRowEnabled
                     )
-                    Text("Add to Target Favorites", color = if (isFavoritesRowEnabled) LocalContentColor.current else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
+                    Text(stringResource(R.string.add_to_target_favorites), color = if (isFavoritesRowEnabled) LocalContentColor.current else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
@@ -359,18 +361,18 @@ fun AddTargetFolderDialog(
                 }
 
                 val primaryButtonText = when {
-                    isNewNameEntered -> "Create"
-                    else -> "Import"
+                    isNewNameEntered -> stringResource(R.string.create)
+                    else -> stringResource(R.string.import_folder)
                 }
                 val moveButtonText = when {
-                    isNewNameEntered -> "Create & Move"
-                    else -> "Import & Move"
+                    isNewNameEntered -> stringResource(R.string.create_and_move)
+                    else -> stringResource(R.string.import_and_move)
                 }
 
                 // A move is only invalid if a new name is NOT entered AND it's the same folder.
                 val isMoveActionInvalid = !isNewNameEntered && isSameFolderAsCurrent
 
-                TextButton(onClick = onDismissRequest) { Text("Cancel") }
+                TextButton(onClick = onDismissRequest) { Text(stringResource(R.string.cancel)) }
                 Button(
                     onClick = { onConfirm(newFolderName, addToFavorites, false) },
                     enabled = isLocationValid

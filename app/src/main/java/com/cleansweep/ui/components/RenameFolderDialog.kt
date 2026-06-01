@@ -26,9 +26,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import com.cleansweep.R
 
 @Composable
 fun RenameFolderDialog(
@@ -48,10 +50,10 @@ fun RenameFolderDialog(
         Column(
             modifier = Modifier.padding(24.dp)
         ) {
-            Text("Rename Folder", style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.rename_folder_title), style = MaterialTheme.typography.headlineSmall)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "Renaming: $currentFolderName",
+                stringResource(R.string.renaming_folder_format, currentFolderName),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -60,7 +62,7 @@ fun RenameFolderDialog(
             OutlinedTextField(
                 value = newName,
                 onValueChange = { newName = it },
-                label = { Text("New folder name") },
+                label = { Text(stringResource(R.string.new_folder_name)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                 keyboardOptions = KeyboardOptions(
@@ -84,14 +86,14 @@ fun RenameFolderDialog(
                 horizontalArrangement = Arrangement.End
             ) {
                 TextButton(onClick = onDismiss) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
                     onClick = { onConfirm(newName) },
                     enabled = newName.isNotBlank() && newName != currentFolderName
                 ) {
-                    Text("Rename")
+                    Text(stringResource(R.string.rename))
                 }
             }
         }

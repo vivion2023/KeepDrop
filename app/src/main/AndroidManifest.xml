@@ -70,6 +70,7 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:localeConfig="@xml/locales_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.CleanSweep"
@@ -86,7 +87,7 @@
             android:name="com.cleansweep.ui.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.CleanSweep"
-            android:configChanges="locale|layoutDirection|uiMode|screenLayout|screenSize|smallestScreenSize"
+            android:configChanges="uiMode|screenLayout|screenSize|smallestScreenSize"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

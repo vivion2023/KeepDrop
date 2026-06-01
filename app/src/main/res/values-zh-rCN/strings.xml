@@ -1,0 +1,657 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ CleanSweep
+  ~ Copyright (c) 2025 LoopOtto
+  ~
+  ~ This program is free software: you can redistribute it and/or modify
+  ~ it under the terms of the GNU General Public License as published by
+  ~ the Free Software Foundation, either version 3 of the License, or any later version.
+  ~
+  ~ This program is distributed in the hope that it will be useful,
+  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  ~ GNU General Public License for more details.
+  ~
+  ~ You should have received a copy of the GNU General Public License
+  ~ along with this program. If not, see <https://www.gnu.org/licenses/>.
+  -->
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="app_name">CleanSweep</string>
+
+    <!-- General / Common -->
+    <string name="confirm">确认</string>
+    <string name="cancel">取消</string>
+    <string name="delete">删除</string>
+    <string name="retry">重试</string>
+    <string name="close">关闭</string>
+    <string name="back">返回</string>
+    <string name="keep">保留</string>
+    <string name="settings">设置</string>
+    <string name="more_options">更多选项</string>
+    <string name="navigate_back">返回上一页</string>
+    <string name="previous_image">上一张图片</string>
+    <string name="next_image">下一张图片</string>
+    <string name="unknown_error">发生未知错误</string>
+    <string name="error_prefix">错误：%1$s</string>
+    <string name="warning">警告</string>
+    <string name="done">完成</string>
+    <string name="open">打开</string>
+    <string name="open_with">打开方式</string>
+    <string name="open_full_screen">全屏打开</string>
+    <string name="share">分享</string>
+    <string name="rename">重命名</string>
+    <string name="folder">文件夹</string>
+    <string name="select_all">全选</string>
+    <string name="unselect_all">取消全选</string>
+    <string name="loading">正在加载…</string>
+    <string name="ok">确定</string>
+    <string name="create">创建</string>
+    <string name="skip">跳过</string>
+    <string name="reset">重置</string>
+
+    <!-- File Operations -->
+    <string name="filename_copied">文件名已复制！</string>
+    <string name="folder_renamed_success">文件夹已成功重命名。</string>
+    <plurals name="files_deleted_success">
+        <item quantity="one">已成功删除 1 个文件。</item>
+        <item quantity="other">已成功删除 %1$d 个文件。</item>
+    </plurals>
+    <string name="could_not_delete_all">错误：无法删除所有选中的文件。</string>
+    <string name="no_files_found_on_disk">未在磁盘上找到选中的文件。它们可能已被外部删除。</string>
+    <plurals name="files_not_found_deleting_remaining">
+        <item quantity="one">未找到 1 个文件，将跳过。</item>
+        <item quantity="other">未找到 %1$d 个文件，将跳过。</item>
+    </plurals>
+    <string name="no_files_selected_delete">未选择要删除的文件。</string>
+    <string name="no_app_to_share">没有可用于分享此文件的应用。</string>
+    <string name="no_app_to_open">没有应用可以打开此文件。</string>
+    <string name="error_creating_uri">准备分享文件时出错。</string>
+    <string name="file_size_label">大小：%1$s</string>
+    <string name="export_filename_default">target_favorites.json</string>
+
+    <!-- Session Setup Screen -->
+    <string name="select_folders_title">选择文件夹</string>
+    <string name="start_session">开始整理</string>
+    <string name="search_hint">搜索</string>
+    <string name="clear_search">清除搜索</string>
+    <string name="scanning_device_message">正在扫描设备中的媒体文件夹…</string>
+    <string name="no_media_folders_found">未找到媒体文件夹</string>
+    <string name="no_media_folders_desc">新设备上可能会出现这种情况。请尝试添加一些照片或视频，或下拉重新扫描。</string>
+    <string name="no_results_found">未找到结果</string>
+    <string name="no_folders_found">未找到文件夹。</string>
+    <string name="no_search_results_desc">没有文件夹名称匹配“%1$s”。</string>
+    <string name="find_duplicates">查找重复项</string>
+    <string name="scanning_progress_title">正在扫描重复项</string>
+    <string name="scan_complete_title">扫描完成</string>
+    <string name="sort">排序</string>
+    <string name="sort_name_az">名称（A-Z）</string>
+    <string name="sort_name_za">名称（Z-A）</string>
+    <string name="sort_size_largest">大小（从大到小）</string>
+    <string name="sort_size_smallest">大小（从小到大）</string>
+    <string name="sort_count_most">项目数量（从多到少）</string>
+    <string name="sort_count_fewest">项目数量（从少到多）</string>
+    <plurals name="context_selected_count">
+        <item quantity="one">已选择 1 项</item>
+        <item quantity="other">已选择 %1$d 项</item>
+    </plurals>
+    <string name="close_selection_mode">关闭选择模式</string>
+    <string name="add_to_favorites">添加到收藏</string>
+    <string name="remove_from_favorites">从收藏中移除</string>
+    <string name="mark_as_sorted">标记为已整理</string>
+    <string name="mark_permanently_as_sorted">永久标记为已整理</string>
+    <string name="mark_sorted_title_single">标记为已整理？</string>
+    <string name="mark_sorted_body_single">确定要从此列表中永久隐藏“%1$s”吗？即使你向该文件夹添加新媒体，它也不会再显示在这里。你可以在设置中重置。</string>
+    <string name="mark_sorted_body_recursive">确定要从此列表中永久隐藏“%1$s”及其子文件夹吗？即使你向这些文件夹添加新媒体，它们也不会再显示在这里。你可以在设置中重置。</string>
+    <plurals name="mark_sorted_title_multiple">
+        <item quantity="one">将 1 个文件夹标记为已整理？</item>
+        <item quantity="other">将 %1$d 个文件夹标记为已整理？</item>
+    </plurals>
+    <plurals name="mark_sorted_body_multiple">
+        <item quantity="one">确定要从此列表中永久隐藏此文件夹（包括任何已选择的子文件夹）吗？你可以在设置中重置。</item>
+        <item quantity="other">确定要从此列表中永久隐藏这 %1$d 个文件夹（包括任何已选择的子文件夹）吗？你可以在设置中重置。</item>
+    </plurals>
+    <string name="move_to_ellipsis">移动到…</string>
+    <string name="search_destination_label">搜索或选择目标位置</string>
+    <string name="move_action">移动</string>
+    <plurals name="folder_item_desc">
+        <item quantity="one">1 个项目 · %2$s</item>
+        <item quantity="other">%1$d 个项目 · %2$s</item>
+    </plurals>
+    <string name="includes_subfolders">包含子文件夹。</string>
+    <string name="select_folder_and_subfolders">选择文件夹和子文件夹</string>
+    <string name="deselect_subfolders">取消选择子文件夹</string>
+    <string name="favorite">收藏</string>
+    <string name="unfavorite">取消收藏</string>
+    <string name="system_folder_badge">系</string>
+
+    <!-- Swiper Screen -->
+    <string name="unsaved_changes_title">未保存的更改</string>
+    <string name="unsaved_changes_message">你有未保存的更改。确定要退出吗？</string>
+    <string name="exit_anyway">仍然退出</string>
+    <string name="review_changes">查看更改</string>
+    <string name="no_more_items">没有更多项目需要整理！</string>
+    <string name="all_organized_title">所有媒体都已整理完成。干得漂亮！</string>
+    <string name="review_skipped_items">查看已跳过项目</string>
+    <string name="select_different_folders">选择其他文件夹</string>
+    <string name="reset_single_folder">重置单个文件夹</string>
+    <string name="reset_all_sorted_media">重置所有已整理媒体</string>
+    <string name="close_app">关闭应用</string>
+    <string name="add_target_folder">添加目标文件夹</string>
+    <string name="add_folder_search_path">搜索或输入路径</string>
+    <string name="selected_path_format">已选择：%1$s</string>
+    <string name="new_folder_name_optional">新文件夹名称（可选）</string>
+    <string name="leave_blank_import_folder">留空则导入文件夹</string>
+    <string name="folder_exists_hint">已存在同名文件夹：%1$s</string>
+    <string name="similar_folder_exists_hint">存在名称相似的文件夹：%1$s</string>
+    <string name="add_to_target_favorites">添加到目标收藏</string>
+    <string name="import_folder">导入</string>
+    <string name="create_and_move">创建并移动</string>
+    <string name="import_and_move">导入并移动</string>
+    <string name="skip_item">跳过项目</string>
+    <string name="undo_last_action">撤销上次操作</string>
+    <string name="expand">展开</string>
+    <string name="collapse">收起</string>
+    <string name="remove_from_bar">从栏中移除</string>
+    <string name="move_to_to_edit">移动到“待编辑”</string>
+    <string name="screenshot">截图</string>
+    <string name="mute_video">视频静音</string>
+    <string name="unmute_video">取消视频静音</string>
+    <string name="pending_conversion_desc">等待转换为图片</string>
+    <string name="forget_sorted_media_title">忘记已整理媒体</string>
+    <string name="search_folder_reset_label">搜索要重置的文件夹…</string>
+    <string name="forget_action">忘记</string>
+    <string name="forget_confirm_title">确认操作</string>
+    <string name="forget_confirm_body">确定要忘记文件夹“%1$s”的所有已整理媒体历史吗？如果该文件夹仍包含媒体，它会重新出现在整理列表中。</string>
+    <string name="forget_success_toast">“%1$s”的历史记录已重置。</string>
+    <string name="no_sorted_history_toast">未找到已整理媒体历史。</string>
+    <string name="changes_applied_success">更改已成功应用！</string>
+    <string name="failed_apply_changes">无法应用一个或多个更改。</string>
+    <string name="added_screenshot_toast">已将截图添加到待处理更改</string>
+    <string name="could_not_find_parent">找不到父文件夹。</string>
+    <string name="refreshed_external_changes">已刷新以同步外部文件更改。</string>
+    <plurals name="target_favorite_removed_toast">
+        <item quantity="one">已移除 1 个不存在的目标收藏。</item>
+        <item quantity="other">已移除 %1$d 个不存在的目标收藏。</item>
+    </plurals>
+    <string name="target_favorite_removed_single_toast" tools:ignore="UnusedResources">已移除 1 个不存在的目标收藏。</string>
+    <plurals name="files_skipped_missing_toast">
+        <item quantity="one">未找到 1 个文件，将跳过。</item>
+        <item quantity="other">未找到 %1$d 个文件，将跳过。</item>
+    </plurals>
+    <string name="select_parent_location_toast">请选择父文件夹位置。</string>
+    <string name="select_folder_import_toast">请选择要导入的文件夹。</string>
+    <string name="video_no_audio_toast">视频没有音轨。</string>
+    <string name="failed_load_media_prefix">加载媒体失败：%1$s</string>
+    <string name="apply_changes_button">应用更改</string>
+    <string name="folder_name_to_edit">待编辑</string>
+    <string name="cancel_all_changes">全部取消</string>
+    <string name="summary_title_format">查看更改（%1$d）</string>
+    <string name="move_to_folder_header">移动到：%1$s（%2$d）</string>
+    <string name="convert_to_image_header">要转换为图片（%1$d）</string>
+    <string name="delete_header">要删除（%1$d）</string>
+    <string name="keep_header">要保留（%1$d）</string>
+    <string name="confirm_changes_title">确认更改</string>
+    <string name="confirm_changes_body">确定要将这些更改应用到你的文件吗？</string>
+
+    <!-- Plurals -->
+    <plurals name="skipped_session_items_plurals">
+        <item quantity="one">你在本次整理中跳过了 1 个项目。</item>
+        <item quantity="other">你在本次整理中跳过了 %d 个项目。</item>
+    </plurals>
+    <plurals name="files_selected_count_plurals">
+        <item quantity="one">1 个文件</item>
+        <item quantity="other">%d 个文件</item>
+    </plurals>
+    <plurals name="unreadable_files_count_plurals">
+        <item quantity="one">1 个文件无法读取</item>
+        <item quantity="other">%d 个文件无法读取</item>
+    </plurals>
+
+    <!-- Duplicates Screen -->
+    <string name="duplicate_finder_title">重复项查找器</string>
+    <string name="scanning_phase">正在扫描…</string>
+    <string name="scanning_preparing_phase">正在准备…</string>
+    <string name="scanning_cancelling_phase">正在取消…</string>
+    <plurals name="scan_result_title">
+        <item quantity="one">扫描结果（1 组）</item>
+        <item quantity="other">扫描结果（%1$d 组）</item>
+    </plurals>
+    <string name="delete_all_exact_duplicates">删除所有完全重复项</string>
+    <string name="new_scan">新扫描</string>
+    <string name="change_grid_columns">更改网格列数</string>
+    <string name="toggle_view_mode">切换视图模式</string>
+    <string name="confirm_deletion_title">确认删除</string>
+    <string name="confirm_deletion_body">确定要永久删除选中的文件吗？此操作无法撤销。</string>
+    <string name="delete_all_exact_title">删除所有完全重复项？</string>
+    <string name="delete_all_exact_body">这会在每组完全重复项中自动保留最旧的文件并删除其余文件。\n\n注意：即使被标记为完全重复的组也可能存在误判。建议手动检查。</string>
+    <string name="do_not_ask_again">不再询问</string>
+    <string name="delete_all">全部删除</string>
+    <string name="view_group_title">查看分组</string>
+    <plurals name="view_group_items_title">
+        <item quantity="one">查看分组（1 项）</item>
+        <item quantity="other">查看分组（%1$d 项）</item>
+    </plurals>
+    <string name="change_layout_columns">更改布局列数</string>
+    <string name="keep_oldest">保留最旧</string>
+    <string name="keep_newest">保留最新</string>
+    <string name="flag_as_incorrect">标记为不正确</string>
+    <string name="hide_group">隐藏分组</string>
+    <string name="scan_exact_duplicates_title">完全重复项</string>
+    <string name="scan_exact_duplicates_desc">查找 100% 相同的文件。</string>
+    <string name="scan_similar_media_title">相似媒体</string>
+    <string name="scan_similar_media_desc">查找看起来相似的媒体（例如连拍照片、相似视频）。</string>
+    <string name="scan_first_time_note">注意：首次扫描可能需要一些时间。如果你离开应用，该过程会在后台继续。</string>
+    <string name="start_scan">开始扫描</string>
+    <string name="view_last_scan_results">查看上次扫描结果</string>
+    <plurals name="scan_limited_to_folders">
+        <item quantity="one">扫描范围限制为 1 个文件夹。</item>
+        <item quantity="other">扫描范围限制为 %1$d 个文件夹。</item>
+    </plurals>
+    <plurals name="scan_ignores_folders">
+        <item quantity="one">扫描将忽略 1 个文件夹。</item>
+        <item quantity="other">扫描将忽略 %1$d 个文件夹。</item>
+    </plurals>
+    <string name="scan_filter_active">扫描筛选已启用</string>
+    <string name="manage">管理</string>
+    <string name="no_folders_in_list">此列表中没有文件夹。点按“管理”添加一些。</string>
+    <plurals name="list_more_items_suffix">
+        <item quantity="one">• …还有 1 项</item>
+        <item quantity="other">• …还有 %1$d 项</item>
+    </plurals>
+    <string name="cancel_scan">取消扫描</string>
+    <string name="no_exact_or_similar_found">未找到完全重复项或相似媒体。做得很好！</string>
+    <string name="no_exact_found">未找到完全重复项。做得很好！</string>
+    <string name="no_similar_found">未找到相似媒体。做得很好！</string>
+    <string name="stale_results_warning">正在显示 %1$s 的结果</string>
+    <string name="run_new_scan_hint">运行新扫描以获取最新结果。</string>
+    <string name="dismiss_warning">关闭警告</string>
+    <string name="rescan">重新扫描</string>
+    <string name="unreadable_files_hint">这些文件可能已损坏或无法访问。点按查看详情。</string>
+    <string name="unreadable_files_dialog_title">无法读取的文件</string>
+    <string name="no_unreadable_user_files">未找到无法读取的用户文件。这是理想状态。任何剩余文件很可能是隐藏的系统或临时文件，可通过下方开关查看。</string>
+    <string name="no_unreadable_files_device">未在你的设备上找到无法读取的文件。</string>
+    <string name="show_hidden_temp_files">显示隐藏/临时文件</string>
+    <string name="unknown_location">未知位置</string>
+    <plurals name="duplicates_found_count">
+        <item quantity="one">找到 1 个重复项</item>
+        <item quantity="other">找到 %1$d 个重复项</item>
+    </plurals>
+    <plurals name="similar_media_found_count">
+        <item quantity="one">找到 1 个相似媒体</item>
+        <item quantity="other">找到 %1$d 个相似媒体</item>
+    </plurals>
+    <string name="size_per_file">每个文件大小：%1$s</string>
+    <string name="total_group_size">分组总大小：%1$s</string>
+    <plurals name="copies_count_suffix">
+        <item quantity="one">+ 1 个副本</item>
+        <item quantity="other">+ %1$d 个副本</item>
+    </plurals>
+    <plurals name="similar_count_suffix">
+        <item quantity="one">+ 1 个相似项</item>
+        <item quantity="other">+ %1$d 个相似项</item>
+    </plurals>
+    <string name="selection_state">选择状态</string>
+    <string name="primary_image_desc">分组的主图像</string>
+    <string name="video">视频</string>
+    <string name="remove_folder">移除文件夹</string>
+    <string name="reclaim_space_format">可回收空间：%1$s</string>
+    <string name="files_selected_format">已选择 %1$s</string>
+    <string name="algorithm_corrected_toast">算法已更正。这些项目不会再次被分到同一组。</string>
+    <string name="group_hidden_toast">分组已隐藏。只有成员发生变化时才会重新出现。</string>
+    <string name="notification_permission_required">需要通知权限才能在后台显示扫描进度。</string>
+    <string name="scan_already_in_progress">已有扫描正在进行。</string>
+    <string name="select_one_scan_type">请至少选择一种扫描类型。</string>
+    <string name="scan_cancelled_toast">扫描已取消</string>
+    <string name="scan_cancelled_title">扫描已取消</string>
+    <string name="scan_cancelled_notification_text">重复项扫描已取消。</string>
+    <string name="scan_complete_selection_cleared">扫描完成。选择已清除。</string>
+    <string name="no_valid_cache_toast">找不到任何有效的缓存结果。</string>
+    <string name="no_exact_duplicates_toast">未找到完全重复项。</string>
+    <string name="no_duplicates_to_delete_toast">未找到可删除的重复项。</string>
+    <string name="no_duplicates_found_notification">未找到重复项。</string>
+    <string name="sorted_media_reset_toast">已整理媒体历史已重置。</string>
+    <string name="info_icon_desc">信息</string>
+
+    <!-- Session Setup ViewModel -->
+    <string name="failed_load_folders">加载媒体文件夹失败：%1$s</string>
+    <string name="failed_refresh_folders">刷新媒体文件夹失败：%1$s</string>
+    <string name="folder_renamed">文件夹已成功重命名</string>
+    <plurals name="moved_files_success_msg">
+        <item quantity="one">已移动 1 个文件。</item>
+        <item quantity="other">已移动 %1$d 个文件。</item>
+    </plurals>
+    <plurals name="moved_files_failed_suffix">
+        <item quantity="one"> 1 个失败。</item>
+        <item quantity="other"> %1$d 个失败。</item>
+    </plurals>
+    <string name="favorites_added_removed_msg" tools:ignore="PluralsCandidate">%1$d 个文件夹已收藏，%2$d 个已取消收藏。</string>
+    <plurals name="favorites_added_msg">
+        <item quantity="one">已将 1 个文件夹添加到收藏。</item>
+        <item quantity="other">已将 %1$d 个文件夹添加到收藏。</item>
+    </plurals>
+    <plurals name="favorites_removed_msg">
+        <item quantity="one">已从收藏中移除 1 个文件夹。</item>
+        <item quantity="other">已从收藏中移除 %1$d 个文件夹。</item>
+    </plurals>
+    <string name="no_changes_system_folders">未应用更改。系统文件夹无法收藏。</string>
+    <string name="folder_hidden_toast">文件夹已隐藏。</string>
+    <plurals name="folders_hidden_toast">
+        <item quantity="one">已隐藏 1 个文件夹。</item>
+        <item quantity="other">已隐藏 %1$d 个文件夹。</item>
+    </plurals>
+    <string name="favorite_folders_category">收藏文件夹</string>
+    <string name="system_folders_category">系统文件夹</string>
+    <string name="user_folders_category">用户文件夹</string>
+
+    <!-- Onboarding Screen -->
+    <string name="onboarding_skip">跳过</string>
+    <string name="onboarding_previous">上一步</string>
+    <string name="onboarding_next">下一步</string>
+    <string name="onboarding_grant_permission">授予所有文件访问权限</string>
+    <string name="onboarding_get_started">开始使用</string>
+    <string name="onboarding_close_dialog_title">关闭 CleanSweep</string>
+    <string name="onboarding_close_dialog_body">CleanSweep 没有所有文件访问权限就无法工作。我们曾尝试避免使用它，但最终发现为了让 CleanSweep 对大多数用户正常工作，这项权限是必需的。</string>
+    <string name="permission_screen_title">需要所有文件访问权限</string>
+    <string name="permission_screen_desc">CleanSweep 需要所有文件访问权限，才能整理设备上所有文件夹中的照片和视频。</string>
+    <string name="permission_screen_desc_onboarding">CleanSweep 需要所有文件访问权限，才能整理设备上所有文件夹中的照片和视频。此权限已在引导流程中请求。</string>
+    <string name="permission_screen_instruction">请在设备设置中授予权限以使用 CleanSweep。</string>
+    <string name="permission_screen_continue_instruction">请在设备设置中授予权限以继续使用 CleanSweep。</string>
+    <string name="open_settings">打开设置</string>
+
+    <!-- Onboarding Pages -->
+    <string name="onboarding_p1_title">欢迎使用 CleanSweep</string>
+    <string name="onboarding_p1_desc">掌控你的图库。用简单而强大的方式整理成千上万张照片和视频。\n找回你的时间和存储空间。</string>
+    <string name="onboarding_p2_title">简单滑动</string>
+    <string name="onboarding_p2_desc">向右滑动保留，向左滑动删除。操作错了？撤销按钮会帮你！还不确定？使用跳过按钮稍后再决定。</string>
+    <string name="onboarding_p3_title">强大的整理功能</string>
+    <string name="onboarding_p3_desc">点按文件夹即可立即移动文件。长按项目可快速发送到“待编辑”文件夹或访问其他快捷操作。</string>
+    <string name="onboarding_p4_title">查找相似照片</string>
+    <string name="onboarding_p4_desc">我们的重复项查找器不仅能查找完全相同的副本，还能查找视觉上相似的照片和视频。你甚至可以在设置中调整灵敏度！</string>
+    <string name="onboarding_p5_title">视频增强功能</string>
+    <string name="onboarding_p5_desc">通过播放速度控制快速浏览视频。你甚至可以保存单帧画面，将完美瞬间捕捉为一张新照片。</string>
+    <string name="onboarding_p6_title">一切由你掌控</string>
+    <string name="onboarding_p6_desc">你已经了解了基础功能。现在可以比以往更快地整理媒体了。</string>
+
+    <!-- Settings Screen -->
+    <string name="search_settings_placeholder">搜索设置…</string>
+    <string name="close_search">关闭搜索</string>
+    <string name="search_settings_icon_desc">搜索设置</string>
+    <string name="appearance_section_title">外观</string>
+    <string name="behavior_section_title">行为</string>
+    <string name="duplicate_finder_section_title">重复项查找器</string>
+    <string name="advanced_section_title">高级</string>
+    <string name="help_support_section_title">帮助与支持</string>
+    <string name="about_section_title">关于</string>
+    <string name="no_settings_found">未找到与“%1$s”相关的设置</string>
+
+    <!-- Language Settings -->
+    <string name="language_title">语言</string>
+    <string name="language_desc">选择你的首选语言。</string>
+    <string name="language_system">跟随系统</string>
+    <string name="language_english">English</string>
+    <string name="language_italian">Italiano</string>
+    <string name="language_chinese_simplified">中文</string>
+
+    <!-- Theme Settings -->
+    <string name="theme_title">主题</string>
+    <string name="theme_system_display">跟随系统</string>
+    <string name="theme_light_display">浅色</string>
+    <string name="theme_dark_display">深色</string>
+    <string name="theme_darker_display">更深色</string>
+    <string name="theme_amoled_display">AMOLED</string>
+    <string name="theme_system_desc">根据系统设置自动切换主题</string>
+    <string name="theme_light_desc">明亮的浅色主题</string>
+    <string name="theme_dark_desc">适合弱光环境的深色主题</string>
+    <string name="theme_darker_desc">遵循 Material Design 标准的更深色主题</string>
+    <string name="theme_amoled_desc">为 AMOLED 显示屏优化的纯黑主题</string>
+    <string name="dynamic_colors_title">使用动态颜色</string>
+    <string name="dynamic_colors_desc">使用系统主题中的颜色</string>
+    <string name="dynamic_colors_req_android_12">需要 Android 12 或更高版本</string>
+    <string name="accent_color_title">强调色</string>
+    <string name="customize_colors_title">自定义颜色</string>
+
+    <!-- UI Layout Settings -->
+    <string name="folder_name_position_title">文件夹名称位置</string>
+    <string name="folder_name_position_desc">选择在整理屏幕上显示当前文件夹名称的位置。</string>
+    <string name="folder_name_layout_above">媒体卡片上方</string>
+    <string name="folder_name_layout_below">媒体卡片下方</string>
+    <string name="folder_name_layout_hidden">隐藏</string>
+    <string name="compact_folder_view_title">紧凑文件夹视图</string>
+    <string name="compact_folder_view_desc">以更紧凑的列表样式显示文件夹</string>
+    <string name="legacy_folder_icons_title">使用首字母文件夹图标</string>
+    <string name="legacy_folder_icons_desc">使用文件夹名称的首字母作为图标</string>
+    <string name="hide_media_filename_title">隐藏媒体文件名</string>
+    <string name="hide_media_filename_desc">隐藏媒体卡片上的文件名覆盖层</string>
+    <string name="folder_bar_layout_title">文件夹栏布局</string>
+    <string name="folder_bar_layout_desc">选择“移动到”栏的滚动方向。</string>
+    <string name="layout_horizontal">水平</string>
+    <string name="layout_vertical">垂直</string>
+    <string name="skip_partial_expansion_title">跳过部分展开</string>
+    <string name="skip_partial_expansion_desc">摘要面板将直接以完整大小打开。</string>
+    <string name="use_full_screen_summary_title">使用全屏摘要</string>
+    <string name="use_full_screen_summary_desc">启用后，面板在需要时会以屏幕高度作为最大高度。</string>
+
+    <!-- Swipe & Gesture Settings -->
+    <string name="swipe_sensitivity_title">滑动灵敏度</string>
+    <string name="swipe_sensitivity_desc">调整触发操作所需的滑动距离。</string>
+    <string name="sensitivity_low">低</string>
+    <string name="sensitivity_medium">中</string>
+    <string name="sensitivity_high">高</string>
+    <string name="swipe_down_action_title">下滑操作</string>
+    <string name="swipe_down_action_desc">为媒体卡片上的下滑手势分配快捷操作。</string>
+    <string name="action_none">无</string>
+    <string name="full_screen_swipe_title">全屏滑动</string>
+    <string name="full_screen_swipe_desc">允许在背景区域滑动，而不仅限于图片本身。</string>
+
+    <!-- Video & Media Settings -->
+    <string name="default_video_speed_title">默认视频速度</string>
+    <string name="default_video_speed_desc">设置视频的默认播放速度。</string>
+    <string name="screenshot_deletes_video_title">截图同时删除原视频</string>
+    <string name="screenshot_deletes_video_desc">从视频截图时，自动将该视频加入删除队列。</string>
+    <string name="screenshot_quality_title">截图质量（JPEG）</string>
+    <string name="screenshot_quality_desc">质量越高，文件越大。默认值为 90。</string>
+    <string name="quality_high">高（95）</string>
+    <string name="quality_good">良好（90）</string>
+    <string name="quality_balanced">均衡（85）</string>
+    <string name="quality_low">低（75）</string>
+
+    <!-- Folder Selection Settings -->
+    <string name="folder_selection_mode_title">文件夹选择模式</string>
+    <string name="mode_all_folders">所有文件夹</string>
+    <string name="mode_remember_previous">记住上次选择</string>
+    <string name="mode_none">不选择</string>
+    <string name="desc_mode_all">默认选择所有文件夹</string>
+    <string name="desc_mode_remember">记住并选择之前选择过的文件夹</string>
+    <string name="desc_mode_none">默认不选择任何文件夹</string>
+    <string name="invert_swipe_title">反转滑动操作</string>
+    <string name="invert_swipe_desc">反转滑动操作：向左保留，向右删除</string>
+    <string name="hide_skip_button_title">隐藏跳过按钮</string>
+    <string name="hide_skip_button_desc">启用后，底部栏中的“跳过”按钮将被隐藏。</string>
+    <string name="add_fav_by_default_title">默认添加到收藏</string>
+    <string name="add_fav_by_default_desc">添加新的目标文件夹时，默认选中“添加到收藏”开关。</string>
+    <string name="unfav_removes_from_bar_title">取消收藏也会移除</string>
+    <string name="unfav_removes_from_bar_desc">启用后，取消收藏文件夹也会在本次整理中隐藏它。</string>
+    <string name="hint_on_existing_folder_title">提示已有文件夹名称</string>
+    <string name="hint_on_existing_folder_desc">输入时，如果存在同名文件夹则显示提示。</string>
+    <string name="initial_dialog_focus_title">初始对话框焦点</string>
+    <string name="initial_dialog_focus_desc">添加文件夹时，选择首先获得焦点的字段。</string>
+    <string name="focus_search_path">搜索路径</string>
+    <string name="focus_folder_name">新文件夹名称</string>
+    <string name="show_favorites_setup_title">在设置流程中显示收藏</string>
+    <string name="show_favorites_setup_desc">在设置流程中显示收藏的文件夹</string>
+    <string name="default_album_location_title">默认相册位置</string>
+    <string name="default_album_location_desc">选择创建新相册时使用的默认文件夹。</string>
+    <string name="search_custom_folder">搜索自定义文件夹</string>
+    <string name="no_default_folder_selected">未选择默认文件夹</string>
+    <string name="current_path_prefix">当前：%1$s</string>
+    <string name="remember_organized_media_title">记住已整理媒体</string>
+    <string name="remember_organized_media_desc">在以后的整理中跳过已经移动过的媒体</string>
+    <string name="reset_organized_media_history">重置所有已整理媒体历史</string>
+    <string name="forget_sorted_media_folder_title">忘记文件夹中的已整理媒体</string>
+    <string name="forget_sorted_media_folder_desc">选择一个文件夹，让其中的媒体重新出现以供整理。</string>
+    <string name="select_folder_to_forget">选择要忘记的文件夹</string>
+    <string name="search_autofocus_title">启用搜索自动聚焦</string>
+    <string name="search_autofocus_desc">打开应用时自动聚焦到搜索栏</string>
+    <string name="unselect_all_behavior_title">搜索中的“取消全选”行为</string>
+    <string name="unselect_everything">取消选择所有项目</string>
+    <string name="unselect_visible_only">仅取消可见项目</string>
+    <string name="desc_unselect_global">清除整个选择，即使项目被当前搜索筛选隐藏。</string>
+    <string name="desc_unselect_visible">只取消选择当前搜索结果中可见的项目。隐藏的选择会保留。</string>
+
+    <!-- Duplicate Finder Settings -->
+    <string name="similarity_level_title">相似度级别</string>
+    <string name="similarity_level_strict">严格</string>
+    <string name="similarity_level_balanced">均衡</string>
+    <string name="similarity_level_loose">宽松</string>
+    <string name="similarity_level_strict_desc">匹配较少，误报概率很低。</string>
+    <string name="similarity_level_balanced_desc">在准确性和匹配数量之间取得良好平衡。</string>
+    <string name="similarity_level_loose_desc">匹配更多，但可能包含无关媒体。</string>
+    <string name="scan_scope_title">扫描范围</string>
+    <string name="scan_scope_all">扫描所有文件</string>
+    <string name="scan_scope_include">包含指定文件夹</string>
+    <string name="scan_scope_exclude">排除指定文件夹</string>
+    <string name="scan_scope_all_desc">扫描设备上的所有媒体。</string>
+    <plurals name="scan_scope_include_desc">
+        <item quantity="one">仅扫描 1 个已选择文件夹中的媒体。</item>
+        <item quantity="other">仅扫描 %1$d 个已选择文件夹中的媒体。</item>
+    </plurals>
+    <plurals name="scan_scope_exclude_desc">
+        <item quantity="one">扫描除 1 个已选择文件夹以外的所有媒体。</item>
+        <item quantity="other">扫描除 %1$d 个已选择文件夹以外的所有媒体。</item>
+    </plurals>
+    <string name="manage_include_list">管理包含列表</string>
+    <string name="manage_exclude_list">管理排除列表</string>
+    <string name="manage_list_format">%1$s（%2$d）</string>
+
+    <!-- Advanced Settings -->
+    <string name="media_indexing_status_title">媒体索引状态</string>
+    <string name="export_target_favorites_title">导出目标收藏</string>
+    <string name="export_target_favorites_desc">将你收藏的目标文件夹保存到文件。</string>
+    <string name="import_target_favorites_title">导入目标收藏</string>
+    <string name="import_target_favorites_desc">从文件加载收藏的目标文件夹。</string>
+    <string name="reset_dialog_warnings_title">重置对话框警告</string>
+    <string name="reset_dialog_warnings_desc">重新显示所有确认对话框。</string>
+
+    <!-- Help & Support Settings -->
+    <string name="onboarding_tutorial_title">引导教程</string>
+    <string name="onboarding_tutorial_desc">重新播放引导流程以了解应用功能。</string>
+    <string name="replay_tutorial_button">重播教程</string>
+
+    <!-- About Settings -->
+    <string name="support_development_title">支持开发</string>
+    <string name="support_development_desc">支持此项目</string>
+    <string name="version_title">版本</string>
+    <string name="app_version_copied">应用版本已复制：%1$s</string>
+    <string name="about_cleansweep_title">关于 CleanSweep</string>
+    <string name="about_cleansweep_desc">了解更多关于 CleanSweep 的信息</string>
+    <string name="github_title">GitHub</string>
+    <string name="github_summary">github.com/LoopOtto/CleanSweep</string>
+    <string name="gitlab_title">GitLab</string>
+    <string name="gitlab_summary">gitlab.com/LoopOtto/CleanSweep（只读镜像）</string>
+    <string name="open_source_licenses_title">开源许可</string>
+    <string name="open_source_licenses_desc">查看开源许可</string>
+
+    <!-- Settings Dialogs & Toasts -->
+    <string name="onboarding_replay_toast">引导教程将在下次启动应用时显示。</string>
+    <string name="no_target_favs_export">没有可导出的目标收藏。</string>
+    <string name="no_existing_favs_export">未找到可导出的现有收藏文件夹。</string>
+    <plurals name="exported_favs_toast">
+        <item quantity="one">已导出 1 个收藏。</item>
+        <item quantity="other">已导出 %1$d 个收藏。</item>
+    </plurals>
+    <plurals name="exported_favs_skipped_suffix">
+        <item quantity="one"> 已跳过 1 个不存在的收藏。</item>
+        <item quantity="other"> 已跳过 %1$d 个不存在的收藏。</item>
+    </plurals>
+    <string name="import_no_paths_found">所选文件中未找到有效的文件夹路径。</string>
+    <plurals name="imported_favs_success">
+        <item quantity="one">已成功导入 1 个收藏。</item>
+        <item quantity="other">已成功导入 %1$d 个收藏。</item>
+    </plurals>
+    <plurals name="imported_favs_missing">
+        <item quantity="one">已导入 1 个文件夹。磁盘上未找到该文件夹。</item>
+        <item quantity="other">已导入 %1$d 个文件夹。部分文件夹未找到。</item>
+    </plurals>
+    <string name="import_invalid_format">导入失败：文件格式无效。</string>
+    <plurals name="created_missing_folders_toast">
+        <item quantity="one">已创建并导入 1 个缺失文件夹。</item>
+        <item quantity="other">已创建并导入 %1$d 个缺失文件夹。</item>
+    </plurals>
+    <string name="could_not_create_folders">无法创建缺失的文件夹。</string>
+    <string name="folder_list_refreshed_toast">文件夹列表已刷新，请重新打开对话框。</string>
+    <string name="no_history_to_reset">没有可重置的已整理媒体历史。</string>
+    <string name="all_dialog_warnings_reset">所有对话框警告都已重置。</string>
+    <string name="sorted_history_reset_success">已整理媒体历史已重置。</string>
+    <string name="folder_history_forgotten">已忘记“%1$s”的整理历史。</string>
+    <string name="no_source_favs_to_reset">没有可重置的来源收藏。</string>
+    <string name="source_favs_cleared">来源文件夹收藏已清除。</string>
+    <string name="no_target_favs_to_reset">没有可重置的目标收藏。</string>
+    <string name="target_favs_cleared">目标文件夹收藏已清除。</string>
+    <string name="full_device_scan_complete">全设备扫描已完成。</string>
+    <string name="scan_failed_interrupted">扫描失败或被中断。</string>
+    <string name="scan_failed_title">扫描失败</string>
+
+    <!-- Advanced Dialogs -->
+    <string name="some_folders_not_found_title">部分文件夹未找到</string>
+    <string name="some_folders_not_found_body">备份文件中的以下文件夹不存在。是否要创建它们？</string>
+    <string name="reset_all_warnings_title">重置所有对话框警告？</string>
+    <string name="reset_all_warnings_body">即使你选择过“不再询问”，这也会让所有确认对话框重新出现。</string>
+    <string name="reset_history_title">重置已整理媒体历史？</string>
+    <string name="reset_history_body">这会清除所有已整理媒体的记录。之前已整理的项目会在新的整理中重新出现。此操作无法撤销。</string>
+    <string name="reset_source_favs_title">重置来源收藏？</string>
+    <string name="reset_source_favs_body">确定要清除所有来源文件夹收藏吗？此操作无法撤销。</string>
+    <string name="reset_target_favs_title">重置目标收藏？</string>
+    <string name="reset_target_favs_body">确定要清除所有目标文件夹收藏吗？此操作无法撤销。</string>
+    <string name="no_folders_added_to_list">此列表中尚未添加任何文件夹。扫描将像禁用此设置一样运行。</string>
+    <string name="add_folder">添加文件夹</string>
+    <string name="rename_folder_title">重命名文件夹</string>
+    <string name="renaming_folder_format">正在重命名：%1$s</string>
+    <string name="new_folder_name">新文件夹名称</string>
+    <string name="unindexed_files_dialog_title">未编入索引的媒体文件</string>
+    <string name="unindexed_files_ideal_state">未找到未编入索引的用户文件。这是理想状态。任何剩余文件很可能是隐藏的系统或临时文件，可通过下方开关查看。</string>
+    <string name="no_unindexed_files_found">未在你的设备上找到未编入索引的文件。</string>
+    <string name="unindexed_files_system_desc">这些文件位于你的设备上，但 MediaStore 并不知道它们。这些文件按设计永远不会被 MediaStore 编入索引。</string>
+    <string name="unindexed_files_user_desc">这些文件位于你的设备上，但 MediaStore 并不知道它们。扫描可能会将它们编入索引。</string>
+    <string name="indexing_status_scanning">正在扫描未编入索引的媒体…</string>
+    <string name="indexing_status_loading">正在加载状态…</string>
+    <string name="indexing_status_initial">按刷新图标检查状态。</string>
+    <string name="indexing_status_format">已索引媒体：%1$s / %2$s 个文件（%3$s）</string>
+    <plurals name="indexing_status_unindexed_count">
+        <item quantity="one">1 个文件不在 MediaStore 索引中。</item>
+        <item quantity="other">%1$d 个文件不在 MediaStore 索引中。</item>
+    </plurals>
+    <string name="indexing_status_breakdown" tools:ignore="PluralsCandidate">（%1$d 个用户文件，%2$d 个隐藏/系统文件）</string>
+    <string name="indexing_status_all_indexed">所有媒体文件都已被 MediaStore 识别。</string>
+    <string name="refresh_scan_icon_desc">刷新状态 / 立即扫描</string>
+    <string name="funding_dialog_title">支持开发</string>
+    <string name="funding_dialog_body">CleanSweep 是免费开源软件。如果你觉得它有用，可以考虑支持它的开发。</string>
+    <string name="address_copied">地址已复制</string>
+    <string name="copy_address_icon_desc">复制地址</string>
+    <string name="funding_dialog_footer">欢迎在交易描述中附上你的 GitHub 用户名！</string>
+
+    <!-- Open-Source Licenses -->
+    <string name="license_content_not_found">未找到许可内容。请查看该库的网站以获取更多信息。</string>
+
+    <!-- Duplicate Scan Notifications -->
+    <plurals name="removed_missing_scan_scope_folders">
+        <item quantity="one">已从扫描范围设置中移除 1 个不存在的文件夹。</item>
+        <item quantity="other">已从扫描范围设置中移除 %1$d 个不存在的文件夹。</item>
+    </plurals>
+    <plurals name="notification_exact_groups">
+        <item quantity="one">完全重复项：1 组</item>
+        <item quantity="other">完全重复项：%1$d 组</item>
+    </plurals>
+    <plurals name="notification_similar_groups">
+        <item quantity="one">相似媒体：1 组</item>
+        <item quantity="other">相似媒体：%1$d 组</item>
+    </plurals>
+    <plurals name="notification_skipped_unreadable_files">
+        <item quantity="one">已跳过：1 个无法读取的文件</item>
+        <item quantity="other">已跳过：%1$d 个无法读取的文件</item>
+    </plurals>
+    <string name="duplicate_scan_progress_channel_name">重复项扫描进度</string>
+    <string name="duplicate_scan_progress_channel_desc">显示重复文件扫描的进度。</string>
+    <string name="duplicate_scan_results_channel_name">重复项扫描结果</string>
+    <string name="duplicate_scan_results_channel_desc">显示重复文件扫描的最终结果。</string>
+
+</resources>
