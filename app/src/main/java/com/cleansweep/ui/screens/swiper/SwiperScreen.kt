@@ -3,7 +3,6 @@
  * Copyright (c) 2025 LoopOtto
  *
  * This program is free software: you can redistribute it and/or modify
-                                    val releaseProgress = (-swipeOffsetX / transitionDistance).coerceIn(0f, 1f)
  * the Free Software Foundation, either version 3 of the License, or any later version.
  *
  * This program is distributed in the hope that it will be useful,
@@ -127,6 +126,7 @@ import androidx.compose.material3.ButtonDefaults
 import java.text.DecimalFormat
 import kotlin.math.abs
 import kotlin.math.log10
+import kotlin.math.min
 import kotlin.math.pow
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -283,6 +283,28 @@ fun SwiperScreen(
                     }
                 },
                 actions = {
+                    AnimatedVisibility(visible = uiState.toDelete.isNotEmpty()) {
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+                                positioning = TooltipAnchorPosition.Above,
+                                spacingBetweenTooltipAndAnchor = 4.dp
+                            ),
+                            tooltip = { PlainTooltip { Text(stringResource(R.string.review_changes)) } },
+                            state = rememberTooltipState()
+                        ) {
+                            BadgedBox(
+                                badge = {
+                                    Badge {
+                                        Text(uiState.toDelete.size.toString())
+                                    }
+                                }
+                            ) {
+                                IconButton(onClick = viewModel::showSummarySheet) {
+                                    Icon(Icons.Default.DeleteOutline, contentDescription = stringResource(R.string.review_changes))
+                                }
+                            }
+                        }
+                    }
                     TooltipBox(
                         positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
                             positioning = TooltipAnchorPosition.Above,
@@ -347,6 +369,7 @@ fun SwiperScreen(
                                 onSwipeLeft = viewModel::handleSwipeLeft,
                                 onSwipeRight = viewModel::handleSwipeRight,
                                 onSwipeDown = viewModel::handleSwipeDown,
+                                onSwipeToDeletePool = viewModel::handleDelete,
                                 onLongPress = viewModel::showMediaItemMenu,
                                 sensitivity = swipeSensitivity,
                                 swipeDownAction = swipeDownAction,
@@ -408,6 +431,7 @@ fun SwiperScreen(
                                 onSwipeLeft = viewModel::handleSwipeLeft,
                                 onSwipeRight = viewModel::handleSwipeRight,
                                 onSwipeDown = viewModel::handleSwipeDown,
+                                onSwipeToDeletePool = viewModel::handleDelete,
                                 onLongPress = viewModel::showMediaItemMenu,
                                 sensitivity = swipeSensitivity,
                                 swipeDownAction = swipeDownAction,
@@ -622,6 +646,7 @@ private fun MainContent(
     onSwipeLeft: () -> Boolean,
     onSwipeRight: () -> Boolean,
     onSwipeDown: () -> Unit,
+    onSwipeToDeletePool: () -> Unit,
     onLongPress: (offset: DpOffset) -> Unit,
     sensitivity: SwipeSensitivity,
     swipeDownAction: SwipeDownAction,
@@ -652,6 +677,7 @@ private fun MainContent(
                 onSwipeLeft = onSwipeLeft,
                 onSwipeRight = onSwipeRight,
                 onSwipeDown = onSwipeDown,
+                onSwipeToDeletePool = onSwipeToDeletePool,
                 onLongPress = onLongPress,
                 modifier = Modifier.weight(1f),
                 sensitivity = sensitivity,
@@ -1278,6 +1304,7 @@ private fun MediaItemCard(
     onSwipeLeft: () -> Boolean,
     onSwipeRight: () -> Boolean,
     onSwipeDown: () -> Unit,
+    onSwipeToDeletePool: () -> Unit,
     onLongPress: (offset: DpOffset) -> Unit,
     onTap: (MediaItem) -> Unit,
     modifier: Modifier = Modifier,
@@ -1340,6 +1367,14 @@ private fun MediaItemCard(
     val rightSwipeProgress = if (activeDirection > 0) transitionProgress else 0f
     val leftBorderAlpha = leftSwipeProgress
     val swipeHintColor = MaterialTheme.colorScheme.primary
+    val deletePoolProgress = if (isDragging && swipeOffsetX > 0f && swipeOffsetY < 0f) {
+        min(
+            swipeOffsetX / swipeThreshold,
+            -swipeOffsetY / (swipeThreshold * 0.6f)
+        ).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
     var globalPosition by remember { mutableStateOf(Offset.Zero) }
 
     LaunchedEffect(item.id) {
@@ -1444,16 +1479,17 @@ private fun MediaItemCard(
                                     longPressJob.cancel()
                                     wasDragging = true
                                     isDragging = true
-                                    if (abs(dragAmount.x) > abs(dragAmount.y) && scale <= 1f) {
+                                    if (scale <= 1f) {
                                         swipeOffsetX += dragAmount.x
-                                        // Lock direction on first significant horizontal move
-                                        if (dragDirection == 0 && abs(swipeOffsetX) > viewConfiguration.touchSlop) {
-                                            dragDirection = if (swipeOffsetX < 0) -1 else 1
+                                        val nextOffsetY = swipeOffsetY + dragAmount.y
+                                        swipeOffsetY = if (nextOffsetY > 0f && swipeDownAction == SwipeDownAction.NONE) {
+                                            0f
+                                        } else {
+                                            nextOffsetY
                                         }
-                                    } else if (abs(dragAmount.y) > abs(dragAmount.x) && scale <= 1f) {
-                                        if (swipeDownAction != SwipeDownAction.NONE) {
-                                            // Prevent dragging card upwards
-                                            swipeOffsetY = (swipeOffsetY + dragAmount.y).coerceAtLeast(0f)
+                                        // Lock direction on first significant horizontal move
+                                        if (dragDirection == 0 && abs(swipeOffsetX) > viewConfiguration.touchSlop && abs(swipeOffsetX) > abs(swipeOffsetY)) {
+                                            dragDirection = if (swipeOffsetX < 0) -1 else 1
                                         }
                                     }
                                     change.consume()
@@ -1465,7 +1501,13 @@ private fun MediaItemCard(
                         isDragging = false
 
                         if (wasDragging) {
+                            val isDeletePoolSwipe = swipeOffsetX > swipeThreshold && -swipeOffsetY > (swipeThreshold * 0.6f)
                             when {
+                                isDeletePoolSwipe -> {
+                                    onSwipeToDeletePool()
+                                    swipeOffsetY = 0f
+                                    animScope.launch { transitionProgressAnim.snapTo(0f) }
+                                }
                                 swipeOffsetX < -swipeThreshold -> {
                                     val releaseProgress = (-swipeOffsetX / transitionDistance).coerceIn(0f, 1f)
                                     swipeOffsetY = 0f
@@ -1599,15 +1641,26 @@ private fun MediaItemCard(
                     }
                     .then(if (!fullScreenSwipe) gestureModifier else Modifier)
                     .graphicsLayer {
-                        val transitionScale = if (activeDirection > 0) 1f - (0.25f * transitionProgress) else 1f
+                        val transitionScale = when {
+                            deletePoolProgress > 0f -> 1f - (0.16f * deletePoolProgress)
+                            activeDirection > 0 -> 1f - (0.25f * transitionProgress)
+                            else -> 1f
+                        }
                         translationX = if (animatedScale > 1f) animatedPanOffset.x
+                            else if (deletePoolProgress > 0f) swipeOffsetX * (0.35f + 0.2f * deletePoolProgress)
                             else if (activeDirection < 0) -currentExitDistancePx * transitionProgress
                             else 0f
-                        translationY = if (animatedScale > 1f) animatedPanOffset.y else visibleOffsetY
+                        translationY = if (animatedScale > 1f) animatedPanOffset.y
+                            else if (deletePoolProgress > 0f) visibleOffsetY * (0.55f + 0.25f * deletePoolProgress)
+                            else visibleOffsetY
                         scaleX = animatedScale * transitionScale
                         scaleY = animatedScale * transitionScale
-                        alpha = if (activeDirection > 0) (1f - transitionProgress).coerceAtLeast(0f) else 1f
-                        rotationZ = 0f
+                        alpha = when {
+                            deletePoolProgress > 0f -> (1f - 0.25f * deletePoolProgress).coerceAtLeast(0.75f)
+                            activeDirection > 0 -> (1f - transitionProgress).coerceAtLeast(0f)
+                            else -> 1f
+                        }
+                        rotationZ = if (deletePoolProgress > 0f) 8f * deletePoolProgress else 0f
                         clip = false
                     },
             ) {

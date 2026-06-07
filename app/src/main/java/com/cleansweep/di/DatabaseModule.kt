@@ -20,6 +20,7 @@ package com.cleansweep.di
 import android.content.Context
 import androidx.room.Room
 import com.cleansweep.data.db.CleanSweepDatabase
+import com.cleansweep.data.db.dao.DeletePoolDao
 import com.cleansweep.data.db.dao.FileSignatureDao
 import com.cleansweep.data.db.dao.FolderDetailsDao
 import com.cleansweep.data.db.dao.PHashDao
@@ -46,7 +47,8 @@ object DatabaseModule {
             CleanSweepDatabase.DATABASE_NAME
         ).addMigrations(
             CleanSweepDatabase.MIGRATION_1_2,
-            CleanSweepDatabase.MIGRATION_2_3
+            CleanSweepDatabase.MIGRATION_2_3,
+            CleanSweepDatabase.MIGRATION_3_4
         ).build()
     }
 
@@ -84,5 +86,11 @@ object DatabaseModule {
     @Singleton
     fun provideSimilarityDenialDao(database: CleanSweepDatabase): SimilarityDenialDao {
         return database.similarityDenialDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideDeletePoolDao(database: CleanSweepDatabase): DeletePoolDao {
+        return database.deletePoolDao()
     }
 }

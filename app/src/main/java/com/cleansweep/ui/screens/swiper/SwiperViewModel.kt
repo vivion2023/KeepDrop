@@ -45,6 +45,9 @@ import com.cleansweep.domain.bus.FileModificationEventBus
 import com.cleansweep.domain.bus.FolderDelta
 import com.cleansweep.domain.bus.FolderUpdateEvent
 import com.cleansweep.domain.bus.FolderUpdateEventBus
+import com.cleansweep.domain.deletepool.DeletePoolManager
+import com.cleansweep.domain.deletepool.FinalDeleteUseCase
+import com.cleansweep.domain.deletepool.mediaKey
 import com.cleansweep.domain.repository.MediaRepository
 import com.cleansweep.ui.components.FolderSearchManager
 import com.cleansweep.ui.theme.AppTheme
@@ -166,6 +169,8 @@ class SwiperViewModel @Inject constructor(
     private val eventBus: FileModificationEventBus,
     private val appLifecycleEventBus: AppLifecycleEventBus,
     private val folderUpdateEventBus: FolderUpdateEventBus,
+    private val deletePoolManager: DeletePoolManager,
+    private val finalDeleteUseCase: FinalDeleteUseCase,
     val folderSearchManager: FolderSearchManager
 ) : ViewModel() {
 
@@ -226,6 +231,7 @@ class SwiperViewModel @Inject constructor(
     private var bucketIds: List<String> = emptyList()
     private var _invertSwipe = false
     private var processedMediaIds = emptySet<String>()
+    private var deletePoolMediaKeys = emptySet<String>()
     private var sessionProcessedMediaIds = mutableSetOf<String>()
     private var _rememberProcessedMediaEnabled = true
     private var _defaultVideoSpeed = 1.0f
@@ -466,7 +472,8 @@ class SwiperViewModel @Inject constructor(
                             // Current item was deleted, need to find the next one
                             val allProcessedIds = sessionProcessedMediaIds +
                                     (if (_rememberProcessedMediaEnabled) processedMediaIds else emptySet()) +
-                                    newPendingChanges.map { it.item.id }.toSet() +
+                                    deletePoolMediaKeys +
+                                    newPendingChanges.map { it.item.mediaKey() }.toSet() +
                                     currentState.sessionSkippedMediaIds
 
                             // search from the *new* list at the *old* index
@@ -474,7 +481,7 @@ class SwiperViewModel @Inject constructor(
 
                             val nextIndexInList = newMediaList
                                 .drop(searchStartIndex)
-                                .indexOfFirst { it.id !in allProcessedIds }
+                                .indexOfFirst { it.mediaKey() !in allProcessedIds }
 
                             if (nextIndexInList != -1) {
                                 newCurrentIndex = searchStartIndex + nextIndexInList
@@ -529,6 +536,7 @@ class SwiperViewModel @Inject constructor(
                     emptySet()
                 }
                 processedMediaIds = latestProcessedPaths
+                deletePoolMediaKeys = deletePoolManager.getActiveMediaKeys()
 
                 var initialItemFound = false
                 val allItems = mutableListOf<MediaItem>()
@@ -552,10 +560,37 @@ class SwiperViewModel @Inject constructor(
                         }
 
                         allItems.addAll(newBatch)
+                        val restoredDeletePoolChanges = newBatch
+                            .filter { it.mediaKey() in deletePoolMediaKeys }
+                            .map { PendingChange(it, SwiperAction.Delete(it)) }
+                        if (restoredDeletePoolChanges.isNotEmpty()) {
+                            _uiState.update { currentState ->
+                                val existingDeleteKeys = currentState.pendingChanges
+                                    .filter { it.action is SwiperAction.Delete }
+                                    .map { it.item.mediaKey() }
+                                    .toSet()
+                                val newDeleteChanges = restoredDeletePoolChanges
+                                    .filterNot { it.item.mediaKey() in existingDeleteKeys }
+                                if (newDeleteChanges.isEmpty()) {
+                                    currentState
+                                } else {
+                                    val updatedChanges = currentState.pendingChanges + newDeleteChanges
+                                    val summary = processSummaryLists(updatedChanges, currentState.folderIdToNameMap)
+                                    savedStateHandle["pendingChanges"] = ArrayList(updatedChanges)
+                                    currentState.copy(
+                                        pendingChanges = updatedChanges,
+                                        toDelete = summary.toDelete,
+                                        toKeep = summary.toKeep,
+                                        toConvert = summary.toConvert,
+                                        groupedMoves = summary.groupedMoves
+                                    )
+                                }
+                            }
+                        }
 
                         if (!initialItemFound) {
-                            val allProcessedIds = sessionProcessedMediaIds + processedMediaIds + _uiState.value.sessionSkippedMediaIds
-                            val firstUnprocessedIndex = allItems.indexOfFirst { it.id !in allProcessedIds }
+                            val allProcessedIds = sessionProcessedMediaIds + processedMediaIds + deletePoolMediaKeys + _uiState.value.sessionSkippedMediaIds
+                            val firstUnprocessedIndex = allItems.indexOfFirst { it.mediaKey() !in allProcessedIds }
                             if (firstUnprocessedIndex != -1) {
                                 initialItemFound = true
                                 _uiState.update {
@@ -757,7 +792,19 @@ class SwiperViewModel @Inject constructor(
 
     fun handleDelete() {
         val currentItem = _uiState.value.currentItem ?: return
-        processAndAdvance(PendingChange(currentItem, SwiperAction.Delete(currentItem)))
+        val change = PendingChange(currentItem, SwiperAction.Delete(currentItem))
+        deletePoolMediaKeys = deletePoolMediaKeys + currentItem.mediaKey()
+        processAndAdvance(change)
+        viewModelScope.launch {
+            try {
+                deletePoolManager.add(currentItem)
+            } catch (e: Exception) {
+                Log.e(logTag, "Failed to add ${currentItem.id} to delete pool", e)
+                deletePoolMediaKeys = deletePoolMediaKeys - currentItem.mediaKey()
+                revertChange(change)
+                _uiState.update { it.copy(toastMessage = context.getString(R.string.error_prefix, e.message ?: context.getString(R.string.unknown_error))) }
+            }
+        }
     }
 
     fun handleSwipeDown() {
@@ -966,9 +1013,27 @@ class SwiperViewModel @Inject constructor(
             }
 
             if (itemsToDelete.isNotEmpty()) {
-                Log.d(logTag, "Executing delete for ${itemsToDelete.size} files.")
-                val deleteSuccess = mediaRepository.deleteMedia(itemsToDelete)
-                if (!deleteSuccess) success = false
+                Log.d(logTag, "Finalizing delete pool for ${itemsToDelete.size} files.")
+                deletePoolManager.addAll(itemsToDelete)
+                val finalDeleteResult = finalDeleteUseCase.deleteActiveEntries(itemsToDelete.map { it.mediaKey() }.toSet())
+                if (finalDeleteResult.deletedMediaKeys.isNotEmpty()) {
+                    deletePoolMediaKeys = deletePoolMediaKeys - finalDeleteResult.deletedMediaKeys.toSet()
+                    eventBus.postEvent(FileModificationEvent.FilesDeleted(finalDeleteResult.deletedMediaKeys))
+                }
+            if (!finalDeleteResult.allHandled) {
+                success = false
+                _uiState.update {
+                    it.copy(
+                        toastMessage = context.getString(
+                            R.string.delete_pool_finalize_partial,
+                            finalDeleteResult.successCount,
+                            finalDeleteResult.totalCount,
+                            finalDeleteResult.failedCount,
+                            finalDeleteResult.permissionCount
+                        )
+                    )
+                }
+            }
             }
 
             completeChanges(success, validatedChanges, moveResults)
@@ -1432,6 +1497,12 @@ class SwiperViewModel @Inject constructor(
     }
 
     fun revertChange(changeToRevert: PendingChange) {
+        if (changeToRevert.action is SwiperAction.Delete) {
+            deletePoolMediaKeys = deletePoolMediaKeys - changeToRevert.item.mediaKey()
+            viewModelScope.launch {
+                deletePoolManager.restore(changeToRevert.item)
+            }
+        }
         _uiState.update { currentState ->
             val updatedPendingChanges = currentState.pendingChanges.filterNot { it.timestamp == changeToRevert.timestamp }
             savedStateHandle["pendingChanges"] = ArrayList(updatedPendingChanges)
@@ -1477,14 +1548,23 @@ class SwiperViewModel @Inject constructor(
 
 
     fun resetPendingChanges() {
+        val deleteChanges = _uiState.value.pendingChanges.filter { it.action is SwiperAction.Delete }
+        if (deleteChanges.isNotEmpty()) {
+            val deleteKeys = deleteChanges.map { it.item.mediaKey() }.toSet()
+            deletePoolMediaKeys = deletePoolMediaKeys - deleteKeys
+            viewModelScope.launch {
+                deleteChanges.forEach { deletePoolManager.restore(it.item) }
+            }
+        }
         _uiState.update { currentState ->
             val emptyChanges = emptyList<PendingChange>()
             val summary = processSummaryLists(emptyChanges, currentState.folderIdToNameMap)
             savedStateHandle["pendingChanges"] = null
 
             val allProcessedIds = sessionProcessedMediaIds +
-                    (if (_rememberProcessedMediaEnabled) processedMediaIds else emptySet())
-            val firstUnprocessedIndex = currentState.allMediaItems.indexOfFirst { it.id !in allProcessedIds }
+                    (if (_rememberProcessedMediaEnabled) processedMediaIds else emptySet()) +
+                    deletePoolMediaKeys
+            val firstUnprocessedIndex = currentState.allMediaItems.indexOfFirst { it.mediaKey() !in allProcessedIds }
 
             val (newCurrentItem, newCurrentIndex, newIsSortingComplete) = if (firstUnprocessedIndex != -1) {
                 Triple(currentState.allMediaItems[firstUnprocessedIndex], firstUnprocessedIndex, false)
@@ -1592,12 +1672,13 @@ class SwiperViewModel @Inject constructor(
 
             val allProcessedIds = sessionProcessedMediaIds +
                     (if (_rememberProcessedMediaEnabled) processedMediaIds else emptySet()) +
-                    state.pendingChanges.map { it.item.id }.toSet() +
+                    deletePoolMediaKeys +
+                    state.pendingChanges.map { it.item.mediaKey() }.toSet() +
                     state.sessionSkippedMediaIds
 
             val nextItems = state.allMediaItems
                 .drop(state.currentIndex + 1)
-                .filterNot { it.id in allProcessedIds || it.isVideo }
+                .filterNot { it.mediaKey() in allProcessedIds || it.isVideo }
                 .take(3)
 
             if (nextItems.isNotEmpty()) {

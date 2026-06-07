@@ -22,6 +22,8 @@
     <string name="confirm">Conferma</string>
     <string name="cancel">Annulla</string>
     <string name="delete">Elimina</string>
+    <string name="delete_pool_swipe_target">Pool eliminazione</string>
+    <string name="delete_pool_finalize_partial">Eliminati %1$d/%2$d; %3$d non riusciti, %4$d richiedono autorizzazione.</string>
     <string name="retry">Riprova</string>
     <string name="close">Chiudi</string>
     <string name="back">Indietro</string>

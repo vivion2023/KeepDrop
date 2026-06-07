@@ -23,6 +23,7 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.cleansweep.data.db.converter.Converters
+import com.cleansweep.data.db.dao.DeletePoolDao
 import com.cleansweep.data.db.dao.FileSignatureDao
 import com.cleansweep.data.db.dao.FolderDetailsDao
 import com.cleansweep.data.db.dao.PHashDao
@@ -36,6 +37,7 @@ import com.cleansweep.data.db.entity.PHashCache
 import com.cleansweep.data.db.entity.ScanResultGroupCacheEntry
 import com.cleansweep.data.db.entity.SimilarityDenial
 import com.cleansweep.data.db.entity.UnreadableFileCache
+import com.cleansweep.data.db.entity.DeletePoolEntry
 
 @Database(
     entities = [
@@ -45,9 +47,10 @@ import com.cleansweep.data.db.entity.UnreadableFileCache
         ScanResultGroupCacheEntry::class,
         MediaItemRefCacheEntry::class,
         UnreadableFileCache::class,
-        SimilarityDenial::class
+        SimilarityDenial::class,
+        DeletePoolEntry::class
     ],
-    version = 3,
+    version = 4,
     autoMigrations = [],
     exportSchema = true
 )
@@ -59,6 +62,7 @@ abstract class CleanSweepDatabase : RoomDatabase() {
     abstract fun scanResultCacheDao(): ScanResultCacheDao
     abstract fun unreadableFileCacheDao(): UnreadableFileCacheDao
     abstract fun similarityDenialDao(): SimilarityDenialDao
+    abstract fun deletePoolDao(): DeletePoolDao
 
     companion object {
         const val DATABASE_NAME = "cleansweep_db"
@@ -82,6 +86,33 @@ abstract class CleanSweepDatabase : RoomDatabase() {
                 """.trimIndent())
                 // Purge the old similar_groups table if it exists to reclaim space
                 db.execSQL("DROP TABLE IF EXISTS similar_groups")
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS delete_pool_entries (
+                        entryId TEXT NOT NULL,
+                        mediaKey TEXT NOT NULL,
+                        locatorType TEXT NOT NULL,
+                        uri TEXT,
+                        filePath TEXT,
+                        mediaType TEXT NOT NULL,
+                        sizeSnapshot INTEGER NOT NULL,
+                        modifiedSnapshot INTEGER NOT NULL,
+                        status TEXT NOT NULL,
+                        resultCode TEXT,
+                        errorMessage TEXT,
+                        addedAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        deleteStartedAt INTEGER,
+                        deleteFinishedAt INTEGER,
+                        PRIMARY KEY(entryId)
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_delete_pool_entries_status_addedAt ON delete_pool_entries(status, addedAt)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_delete_pool_entries_mediaKey ON delete_pool_entries(mediaKey)")
             }
         }
     }

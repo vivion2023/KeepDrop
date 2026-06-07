@@ -52,11 +52,22 @@ class FileOperationsHelper @Inject constructor(
     suspend fun filterExistingFiles(changes: List<PendingChange>): List<PendingChange> = withContext(Dispatchers.IO) {
         changes.filter { change ->
             try {
-                File(change.item.id).exists()
+                mediaItemExists(change.item)
             } catch (e: SecurityException) {
                 Log.w(logTag, "Security exception checking for file existence: ${change.item.id}", e)
                 false
+            } catch (e: Exception) {
+                Log.w(logTag, "Error checking for file existence: ${change.item.id}", e)
+                false
             }
+        }
+    }
+
+    private fun mediaItemExists(item: MediaItem): Boolean {
+        return when (item.uri.scheme) {
+            "content" -> context.contentResolver.openFileDescriptor(item.uri, "r")?.use { true } ?: false
+            "file" -> File(item.filePath.ifBlank { item.id }).exists()
+            else -> File(item.id).exists()
         }
     }
 

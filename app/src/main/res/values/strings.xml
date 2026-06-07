@@ -22,6 +22,8 @@
     <string name="confirm">Confirm</string>
     <string name="cancel">Cancel</string>
     <string name="delete">Delete</string>
+    <string name="delete_pool_swipe_target">Delete pool</string>
+    <string name="delete_pool_finalize_partial">Deleted %1$d/%2$d; %3$d failed, %4$d need permission.</string>
     <string name="retry">Retry</string>
     <string name="close">Close</string>
     <string name="back">Back</string>
