@@ -67,9 +67,10 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
+
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -96,8 +97,8 @@ import com.cleansweep.R
 import com.cleansweep.data.model.MediaItem
 import com.cleansweep.data.repository.SwipeDownAction
 import com.cleansweep.data.repository.SwipeSensitivity
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.Job
+
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.min
@@ -218,6 +219,7 @@ private class SwipeGestureState {
     var cancelFromPrevious by mutableStateOf(false)
     var toPreviousStartProgress by mutableFloatStateOf(0f)
     var handoffItem by mutableStateOf<MediaItem?>(null)
+    var handoffOutgoingItem by mutableStateOf<MediaItem?>(null)
     var handoffToNext by mutableStateOf(true)
     var handoffRevealActive by mutableStateOf(false)
     var deleteFlyStartOffset by mutableStateOf(Offset.Zero)
@@ -230,6 +232,7 @@ private class SwipeGestureState {
     var lastReportedDeletePoolProgress by mutableFloatStateOf(0f)
     /** True when the finger crossed slop on a diagonal path — enables free card drag. */
     var freeDragEnabled by mutableStateOf(false)
+    var browseTransitionJob: Job? = null
 
     fun resetAllState(onDeletePoolProgress: (Float) -> Unit) {
         dragOffsetX = 0f
@@ -242,6 +245,7 @@ private class SwipeGestureState {
         cancelFromPrevious = false
         toPreviousStartProgress = 0f
         handoffItem = null
+        handoffOutgoingItem = null
         handoffToNext = true
         handoffRevealActive = false
         deleteFlyInProgress = false
@@ -312,7 +316,16 @@ internal fun SwipeCardStack(
     val density = LocalDensity.current
     val context = LocalContext.current
     val gesture = remember { SwipeGestureState() }
+    val animationScope = rememberCoroutineScope()
     val latestOnDeletePoolProgress = rememberUpdatedState(onDeletePoolProgress)
+    val latestItem = rememberUpdatedState(item)
+    val latestNextItem = rememberUpdatedState(nextItem)
+    val latestPreviousItem = rememberUpdatedState(previousItem)
+    val latestOnSwipeLeft = rememberUpdatedState(onSwipeLeft)
+    val latestOnSwipeRight = rememberUpdatedState(onSwipeRight)
+    val latestOnSwipeDown = rememberUpdatedState(onSwipeDown)
+    val latestOnSwipeToDeletePool = rememberUpdatedState(onSwipeToDeletePool)
+    val latestOnTap = rememberUpdatedState(onTap)
 
     val swipeThreshold = when (sensitivity) {
         SwipeSensitivity.LOW -> with(density) { 36.dp.toPx() }
@@ -329,13 +342,6 @@ internal fun SwipeCardStack(
     }
     LaunchedEffect(item.id) {
         if (gesture.handoffItem != null || gesture.deleteFlyInProgress) return@LaunchedEffect
-        gesture.transitionProgress.snapTo(0f)
-        gesture.resetAllState(latestOnDeletePoolProgress.value)
-    }
-
-    LaunchedEffect(gesture.handoffItem?.id) {
-        val targetId = gesture.handoffItem?.id ?: return@LaunchedEffect
-        snapshotFlow { item.id }.first { it == targetId }
         gesture.transitionProgress.snapTo(0f)
         gesture.resetAllState(latestOnDeletePoolProgress.value)
     }
@@ -387,6 +393,14 @@ internal fun SwipeCardStack(
         }
 
         val (cardWidth, cardHeight) = cardSizeFor(item)
+        val displayedCurrentItem = if (
+            gesture.handoffRevealActive &&
+            gesture.handoffOutgoingItem != null
+        ) {
+            gesture.handoffOutgoingItem!!
+        } else {
+            item
+        }
         val displayedNextItem = if (
             gesture.handoffRevealActive &&
             gesture.handoffToNext &&
@@ -449,19 +463,30 @@ internal fun SwipeCardStack(
         val latestDeleteFlyTargetY = rememberUpdatedState(deleteFlyTargetYPx)
 
         val gestureModifier = Modifier.pointerInput(
-            item.id,
-            nextItem?.id,
-            previousItem?.id,
             swipeDownAction,
             swipeThreshold,
             transitionDistance,
             exitDistancePx
         ) {
-            forEachGesture {
-                coroutineScope {
-                    val animScope = this
+            val browseCommitDurationMs = 180
 
-                    awaitPointerEventScope {
+            fun launchAnimation(block: suspend () -> Unit) {
+                animationScope.launch { block() }
+            }
+
+            fun launchBrowseTransition(block: suspend () -> Unit) {
+                gesture.browseTransitionJob?.cancel()
+                gesture.browseTransitionJob = animationScope.launch {
+                    try {
+                        block()
+                    } finally {
+                        gesture.browseTransitionJob = null
+                    }
+                }
+            }
+
+            forEachGesture {
+                awaitPointerEventScope {
                         var wasDragging = false
                         var wasZooming = false
                         var dragActive = false
@@ -541,6 +566,47 @@ internal fun SwipeCardStack(
                         }
 
                         awaitFirstDown(requireUnconsumed = true)
+
+                        gesture.browseTransitionJob?.cancel()
+                        gesture.browseTransitionJob = null
+                        if (gesture.handoffRevealActive) {
+                            launchAnimation { gesture.transitionProgress.snapTo(0f) }
+                            gesture.handoffOutgoingItem = null
+                            gesture.resetAllState(reportDeletePoolProgress)
+                            localHorizontalLock = HORIZONTAL_NONE
+                        } else when (gesture.transitionMode) {
+                            TransitionMode.ToNext -> {
+                                val progress = gesture.transitionProgress.value
+                                if (progress > 0f) {
+                                    gesture.dragOffsetX = -progress * exitDistancePx
+                                    gesture.horizontalLock = HORIZONTAL_NEXT
+                                    localHorizontalLock = HORIZONTAL_NEXT
+                                    gesture.transitionMode = TransitionMode.Dragging
+                                } else {
+                                    gesture.transitionMode = TransitionMode.Idle
+                                }
+                                launchAnimation { gesture.transitionProgress.snapTo(0f) }
+                            }
+                            TransitionMode.ToPrevious -> {
+                                val progress = gesture.transitionProgress.value
+                                if (progress > 0f) {
+                                    gesture.dragOffsetX = progress * exitDistancePx
+                                    gesture.toPreviousStartProgress = progress
+                                    gesture.horizontalLock = HORIZONTAL_PREVIOUS
+                                    localHorizontalLock = HORIZONTAL_PREVIOUS
+                                    gesture.transitionMode = TransitionMode.Dragging
+                                } else {
+                                    gesture.transitionMode = TransitionMode.Idle
+                                }
+                                launchAnimation { gesture.transitionProgress.snapTo(0f) }
+                            }
+                            TransitionMode.Cancel -> {
+                                gesture.resetAllState(reportDeletePoolProgress)
+                                localHorizontalLock = HORIZONTAL_NONE
+                                launchAnimation { gesture.transitionProgress.snapTo(0f) }
+                            }
+                            else -> Unit
+                        }
 
                         do {
                             val event = awaitPointerEvent()
@@ -664,20 +730,20 @@ internal fun SwipeCardStack(
                                     gesture.freeDragEnabled = false
                                     gesture.deleteFlyInProgress = true
                                     gesture.transitionMode = TransitionMode.DeletePoolFly
-                                    animScope.launch {
+                                    launchAnimation {
                                         gesture.deleteFlyProgress.snapTo(0f)
                                         gesture.deleteFlyProgress.animateTo(
                                             1f,
                                             tween(300, easing = FastOutSlowInEasing)
                                         )
-                                        onSwipeToDeletePool()
+                                        latestOnSwipeToDeletePool.value()
                                         gesture.deleteFlyProgress.snapTo(0f)
                                         gesture.transitionProgress.snapTo(0f)
                                         gesture.resetAllState(reportDeletePoolProgress)
                                     }
                                 }
                                 gesture.freeDragEnabled -> {
-                                    animScope.launch {
+                                    launchAnimation {
                                         if (offsetX != 0f || offsetY != 0f) {
                                             animateDragToOrigin()
                                         } else {
@@ -690,36 +756,51 @@ internal fun SwipeCardStack(
                                 }
                                 offsetX < -swipeThreshold -> {
                                     val startProgress = (-offsetX / exitDistancePx).coerceIn(0f, 1f)
-                                    gesture.transitionMode = TransitionMode.ToNext
                                     gesture.dragOffsetX = 0f
                                     gesture.dragOffsetY = 0f
                                     gesture.horizontalLock = HORIZONTAL_NONE
-                                    animScope.launch {
-                                        gesture.transitionProgress.snapTo(startProgress)
-                                        if (nextItem == null) {
+                                    val targetNext = latestNextItem.value
+                                    if (targetNext == null) {
+                                        gesture.transitionMode = TransitionMode.ToNext
+                                        launchBrowseTransition {
+                                            gesture.transitionProgress.snapTo(startProgress)
                                             gesture.transitionProgress.animateTo(
                                                 0f,
                                                 spring(dampingRatio = 0.86f, stiffness = 420f)
                                             )
                                             endDrag()
-                                        } else {
-                                            gesture.transitionProgress.animateTo(
-                                                1f,
-                                                tween(220, easing = FastOutSlowInEasing)
-                                            )
-                                            gesture.handoffToNext = true
-                                            gesture.handoffItem = nextItem
-                                            gesture.handoffRevealActive = true
-                                            gesture.transitionMode = TransitionMode.Handoff
-                                            if (!onSwipeLeft()) {
-                                                gesture.handoffItem = null
-                                                gesture.handoffRevealActive = false
-                                                gesture.transitionMode = TransitionMode.ToNext
+                                        }
+                                    } else {
+                                        gesture.handoffOutgoingItem = latestItem.value
+                                        gesture.handoffToNext = true
+                                        gesture.handoffItem = targetNext
+                                        gesture.handoffRevealActive = true
+                                        gesture.transitionMode = TransitionMode.ToNext
+                                        if (!latestOnSwipeLeft.value()) {
+                                            gesture.handoffOutgoingItem = null
+                                            gesture.handoffItem = null
+                                            gesture.handoffRevealActive = false
+                                            launchBrowseTransition {
+                                                gesture.transitionProgress.snapTo(startProgress)
                                                 gesture.transitionProgress.animateTo(
                                                     0f,
                                                     spring(dampingRatio = 0.86f, stiffness = 420f)
                                                 )
                                                 endDrag()
+                                            }
+                                        } else {
+                                            launchBrowseTransition {
+                                                gesture.transitionProgress.snapTo(startProgress)
+                                                gesture.transitionProgress.animateTo(
+                                                    1f,
+                                                    tween(
+                                                        browseCommitDurationMs,
+                                                        easing = FastOutSlowInEasing
+                                                    )
+                                                )
+                                                gesture.transitionProgress.snapTo(0f)
+                                                gesture.handoffOutgoingItem = null
+                                                gesture.resetAllState(reportDeletePoolProgress)
                                             }
                                         }
                                     }
@@ -727,49 +808,64 @@ internal fun SwipeCardStack(
                                 offsetX > swipeThreshold -> {
                                     val startProgress = (offsetX / exitDistancePx).coerceIn(0f, 1f)
                                     gesture.toPreviousStartProgress = startProgress
-                                    gesture.transitionMode = TransitionMode.ToPrevious
                                     gesture.dragOffsetX = 0f
                                     gesture.dragOffsetY = 0f
                                     gesture.horizontalLock = HORIZONTAL_NONE
-                                    animScope.launch {
-                                        gesture.transitionProgress.snapTo(startProgress)
-                                        if (previousItem == null) {
+                                    val targetPrevious = latestPreviousItem.value
+                                    if (targetPrevious == null) {
+                                        gesture.transitionMode = TransitionMode.ToPrevious
+                                        launchBrowseTransition {
+                                            gesture.transitionProgress.snapTo(startProgress)
                                             gesture.transitionProgress.animateTo(
                                                 0f,
                                                 spring(dampingRatio = 0.86f, stiffness = 420f)
                                             )
                                             endDrag()
-                                        } else {
-                                            gesture.transitionProgress.animateTo(
-                                                1f,
-                                                tween(220, easing = FastOutSlowInEasing)
-                                            )
-                                            gesture.handoffToNext = false
-                                            gesture.handoffItem = previousItem
-                                            gesture.handoffRevealActive = true
-                                            gesture.transitionMode = TransitionMode.Handoff
-                                            if (!onSwipeRight()) {
-                                                gesture.handoffItem = null
-                                                gesture.handoffRevealActive = false
-                                                gesture.transitionMode = TransitionMode.ToPrevious
+                                        }
+                                    } else {
+                                        gesture.handoffOutgoingItem = latestItem.value
+                                        gesture.handoffToNext = false
+                                        gesture.handoffItem = targetPrevious
+                                        gesture.handoffRevealActive = true
+                                        gesture.transitionMode = TransitionMode.ToPrevious
+                                        if (!latestOnSwipeRight.value()) {
+                                            gesture.handoffOutgoingItem = null
+                                            gesture.handoffItem = null
+                                            gesture.handoffRevealActive = false
+                                            launchBrowseTransition {
+                                                gesture.transitionProgress.snapTo(startProgress)
                                                 gesture.transitionProgress.animateTo(
                                                     0f,
                                                     spring(dampingRatio = 0.86f, stiffness = 420f)
                                                 )
                                                 endDrag()
                                             }
+                                        } else {
+                                            launchBrowseTransition {
+                                                gesture.transitionProgress.snapTo(startProgress)
+                                                gesture.transitionProgress.animateTo(
+                                                    1f,
+                                                    tween(
+                                                        browseCommitDurationMs,
+                                                        easing = FastOutSlowInEasing
+                                                    )
+                                                )
+                                                gesture.transitionProgress.snapTo(0f)
+                                                gesture.handoffOutgoingItem = null
+                                                gesture.resetAllState(reportDeletePoolProgress)
+                                            }
                                         }
                                     }
                                 }
                                 offsetY > swipeDownThreshold &&
                                     abs(offsetY) > abs(offsetX) * 1.2f -> {
-                                    onSwipeDown()
+                                    latestOnSwipeDown.value()
                                     gesture.dragOffsetY = 0f
                                     endDrag()
-                                    animScope.launch { gesture.transitionProgress.snapTo(0f) }
+                                    launchAnimation { gesture.transitionProgress.snapTo(0f) }
                                 }
                                 else -> {
-                                    animScope.launch {
+                                    launchAnimation {
                                         when (localHorizontalLock) {
                                             HORIZONTAL_NEXT -> {
                                                 val startProgress = (-offsetX / exitDistancePx)
@@ -830,11 +926,10 @@ internal fun SwipeCardStack(
                                 gesture.zoomPanX = 0f
                                 gesture.zoomPanY = 0f
                             } else {
-                                onTap(item)
+                                latestOnTap.value(latestItem.value)
                             }
                         }
                     }
-                }
             }
         }
 
@@ -860,7 +955,7 @@ internal fun SwipeCardStack(
 
             CurrentCardLayer(
                 gesture = gesture,
-                item = item,
+                item = displayedCurrentItem,
                 cardWidth = cardWidth,
                 cardHeight = cardHeight,
                 exitDistancePx = exitDistancePx,

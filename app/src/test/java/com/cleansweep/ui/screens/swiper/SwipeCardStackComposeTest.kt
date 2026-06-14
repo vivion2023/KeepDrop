@@ -111,6 +111,26 @@ class SwipeCardStackComposeTest {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Test
+    fun rapidLeftSwipes_invokeOnSwipeLeftEachTime() {
+        var swipeLeftCount = 0
+        setTestContent(
+            onSwipeLeft = {
+                swipeLeftCount++
+                true
+            }
+        )
+
+        repeat(3) {
+            swipeHorizontal(deltaX = -500f)
+            composeTestRule.waitForIdle()
+        }
+        advanceAnimations()
+
+        assertEquals(3, swipeLeftCount)
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Test
     fun shortLeftSwipe_cancel_doesNotInvokeOnSwipeLeft() {
         var swipeLeftCount = 0
         setTestContent(
