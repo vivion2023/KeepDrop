@@ -72,6 +72,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -114,76 +115,6 @@ private const val FREE_DRAG_ALPHA_MAX_DROP = 0.28f
 private const val FREE_DRAG_ALPHA_FLOOR = 0.55f
 private const val FREE_DRAG_ALPHA_MIN = 0.72f
 private const val FREE_DRAG_DISTANCE_DEAD_ZONE_SQ = 100f
-/** Frozen card-stack constants — see docs/swiper-card-stack.md */
-private const val ADJACENT_CARD_MIN_SCALE = 0.92f
-private const val ADJACENT_CARD_MIN_ALPHA = 0.35f
-
-/** -1 = swiping to next (finger moves left), 0 = free, 1 = swiping to previous */
-private const val HORIZONTAL_NONE = 0
-private const val HORIZONTAL_NEXT = -1
-private const val HORIZONTAL_PREVIOUS = 1
-
-/**
- * Visual transition driven by [transitionProgress] after the finger lifts.
- * [dragOffsetX]/[dragOffsetY] drive live finger tracking while [transitionMode] is [TransitionMode.Dragging].
- */
-private enum class TransitionMode {
-    Idle,
-    Dragging,
-    ToNext,
-    ToPrevious,
-    Cancel,
-    /** Post-commit hold: keeps layer positions frozen while [item] catches up; no swipe hints. */
-    Handoff,
-    /** Release after upper-right delete-pool commit: shrink and fly toward the trash icon. */
-    DeletePoolFly
-}
-
-/** Frozen reveal math — see docs/swiper-card-stack.md; call only from layer modifiers. */
-private fun leftRevealProgress(
-    transitionMode: TransitionMode,
-    horizontalLock: Int,
-    dragOffsetX: Float,
-    exitDistancePx: Float,
-    transitionProgress: Float,
-    cancelFromPrevious: Boolean,
-    handoffToNext: Boolean
-): Float = when {
-    transitionMode == TransitionMode.ToNext -> transitionProgress
-    transitionMode == TransitionMode.Handoff && handoffToNext -> transitionProgress
-    transitionMode == TransitionMode.Cancel && !cancelFromPrevious -> transitionProgress
-    transitionMode == TransitionMode.Dragging && horizontalLock == HORIZONTAL_NEXT ->
-        (-dragOffsetX / exitDistancePx).coerceIn(0f, 1f)
-    else -> 0f
-}
-
-private fun rightRevealProgress(
-    transitionMode: TransitionMode,
-    horizontalLock: Int,
-    dragOffsetX: Float,
-    exitDistancePx: Float,
-    transitionProgress: Float,
-    cancelFromPrevious: Boolean,
-    handoffToNext: Boolean
-): Float = when {
-    transitionMode == TransitionMode.ToPrevious -> transitionProgress
-    transitionMode == TransitionMode.Handoff && !handoffToNext -> transitionProgress
-    transitionMode == TransitionMode.Cancel && cancelFromPrevious -> transitionProgress
-    transitionMode == TransitionMode.Dragging && horizontalLock == HORIZONTAL_PREVIOUS ->
-        (dragOffsetX / exitDistancePx).coerceIn(0f, 1f)
-    else -> 0f
-}
-
-private fun isPreviousLayerOnTop(
-    transitionMode: TransitionMode,
-    horizontalLock: Int,
-    cancelFromPrevious: Boolean,
-    handoffToNext: Boolean
-): Boolean =
-    transitionMode == TransitionMode.ToPrevious ||
-        (transitionMode == TransitionMode.Handoff && !handoffToNext) ||
-        (transitionMode == TransitionMode.Cancel && cancelFromPrevious) ||
-        (transitionMode == TransitionMode.Dragging && horizontalLock == HORIZONTAL_PREVIOUS)
 
 private fun isDeletePoolDrag(offsetX: Float, offsetY: Float): Boolean =
     offsetX > 0f && offsetY < 0f
@@ -915,6 +846,7 @@ internal fun SwipeCardStack(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .testTag(SwipeCardStackTestTags.STACK)
                 .then(if (fullScreenSwipe) gestureModifier else Modifier)
         ) {
             if (displayedNextItem != null && nextCardSize != null) {
@@ -991,6 +923,7 @@ private fun BoxScope.NextCardLayer(
             .width(cardWidth)
             .height(cardHeight)
             .align(Alignment.Center)
+            .testTag(SwipeCardStackTestTags.NEXT)
             .zIndex(1f)
             .graphicsLayer {
                 val reveal = leftRevealProgress(
@@ -1056,6 +989,7 @@ private fun BoxScope.CurrentCardLayer(
             .width(cardWidth)
             .height(cardHeight)
             .align(Alignment.Center)
+            .testTag(SwipeCardStackTestTags.CURRENT)
             .zIndex(if (previousOnTop) 2f else 3f)
             .then(gestureModifier)
             .drawBehind {
@@ -1281,6 +1215,7 @@ private fun BoxScope.PreviousCardLayer(
             .width(cardWidth)
             .height(cardHeight)
             .align(Alignment.Center)
+            .testTag(SwipeCardStackTestTags.PREVIOUS)
             .zIndex(if (previousOnTop) 3f else 0.5f)
             .graphicsLayer {
                 val reveal = rightRevealProgress(
