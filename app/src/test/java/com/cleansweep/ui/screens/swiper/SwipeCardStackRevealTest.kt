@@ -212,6 +212,17 @@ class SwipeCardStackRevealTest {
     }
 
     @Test
+    fun deleteFlyShrinkProgress_isMonotonicWithoutMidFlightPlateau() {
+        val atStart = deleteFlyShrinkProgress(0f)
+        val mid = deleteFlyShrinkProgress(0.35f)
+        val atEnd = deleteFlyShrinkProgress(1f)
+        assertEquals(0f, atStart, 0.001f)
+        assertTrue(mid > 0.15f)
+        assertTrue(mid < atEnd)
+        assertEquals(1f, atEnd, 0.001f)
+    }
+
+    @Test
     fun leftAndRightReveal_clampedToUnitInterval() {
         val left = leftRevealProgress(
             transitionMode = TransitionMode.Dragging,

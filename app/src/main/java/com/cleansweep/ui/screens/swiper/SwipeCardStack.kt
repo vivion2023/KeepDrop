@@ -132,14 +132,6 @@ private fun deletePoolProgressFor(
     0f
 }
 
-/** Shrink/fade only after the card has reached the trash icon. */
-private fun deleteFlyShrinkProgress(flyT: Float): Float {
-    val arriveFraction = 0.58f
-    if (flyT <= arriveFraction) return 0f
-    val t = ((flyT - arriveFraction) / (1f - arriveFraction)).coerceIn(0f, 1f)
-    return t * t
-}
-
 /** 0 at center; ~1 at [referencePx]; shared by free-drag scale, alpha, and rotation. */
 private fun freeDragDistanceProgress(
     offsetX: Float,
@@ -373,11 +365,11 @@ internal fun SwipeCardStack(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .padding(8.dp)
+            .padding(horizontal = 4.dp, vertical = 2.dp)
     ) {
         val containerWidth = maxWidth
-        val maxCardWidth = containerWidth * 0.98f
-        val maxCardHeight = maxHeight * 0.9f
+        val maxCardWidth = containerWidth
+        val maxCardHeight = maxHeight * 0.97f
 
         fun cardSizeFor(mediaItem: MediaItem): Pair<Dp, Dp> {
             val aspectRatio = if (mediaItem.width > 0 && mediaItem.height > 0) {
@@ -667,13 +659,16 @@ internal fun SwipeCardStack(
                                         gesture.lastReportedDeletePoolProgress = 0f
                                         reportDeletePoolProgress(0f)
                                     }
+                                    gesture.dragOffsetX = 0f
+                                    gesture.dragOffsetY = 0f
+                                    gesture.freeDragEnabled = false
+                                    gesture.deleteFlyInProgress = true
+                                    gesture.transitionMode = TransitionMode.DeletePoolFly
                                     animScope.launch {
-                                        gesture.deleteFlyInProgress = true
-                                        gesture.transitionMode = TransitionMode.DeletePoolFly
                                         gesture.deleteFlyProgress.snapTo(0f)
                                         gesture.deleteFlyProgress.animateTo(
                                             1f,
-                                            tween(360, easing = FastOutSlowInEasing)
+                                            tween(300, easing = FastOutSlowInEasing)
                                         )
                                         onSwipeToDeletePool()
                                         gesture.deleteFlyProgress.snapTo(0f)

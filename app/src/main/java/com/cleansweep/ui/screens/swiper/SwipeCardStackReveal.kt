@@ -75,6 +75,12 @@ internal fun rightRevealProgress(
     else -> 0f
 }
 
+/** Smoothstep shrink during delete-pool fly — no flat region after finger release. */
+internal fun deleteFlyShrinkProgress(flyT: Float): Float {
+    val t = flyT.coerceIn(0f, 1f)
+    return t * t * (3f - 2f * t)
+}
+
 internal fun isPreviousLayerOnTop(
     transitionMode: TransitionMode,
     horizontalLock: Int,
