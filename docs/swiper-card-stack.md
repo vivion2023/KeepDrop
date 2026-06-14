@@ -69,6 +69,18 @@ rightReveal = ( dragOffsetX / exitDistancePx)  // finger moves right
 
 Diagonal up-right swipe is separate from browse. Does not alter `leftReveal` / `rightReveal` rules above.
 
+## Performance (drag path)
+
+Horizontal browse math above is frozen; these rules apply to **how** it is implemented:
+
+1. **Reveal progress** (`leftReveal` / `rightReveal`) must be computed inside `graphicsLayer` / `drawBehind` lambdas via `leftRevealProgress()` / `rightRevealProgress()` — not in the Composable function body. Same formulas as the spec.
+2. **z-index** during right swipe uses `horizontalLock` / `transitionMode`, not a body-level reveal float.
+3. **Delete-pool progress** callbacks fire only when the value changes (avoids parent chrome recomposition).
+4. **Adjacent preload** and preview `AsyncImage` decode at screen-width cap (~1440px max), not full resolution.
+5. **Left hint** uses a light `drawBehind` horizontal gradient, not a per-frame radial `Canvas`.
+
+If drag feels laggy after edits, check for new `dragOffsetX` reads in the Composable body or heavy work inside `pageContent` on every pointer event.
+
 ## Regression checklist
 
 Before merging changes to `SwipeCardStack.kt`:

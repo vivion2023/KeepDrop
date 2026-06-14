@@ -65,6 +65,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.ui.platform.LocalDensity
@@ -650,34 +651,30 @@ private fun MainContent(
         if (folderNameLayout == FolderNameLayout.ABOVE) {
             FolderNameHeader(currentItem.bucketName)
         }
-        // Keying the MediaItemCard forces a full recomposition when the item ID changes,
-        // preventing stale UI issues (e.g., image not updating after skip during swiping).
-        key(currentItem.id) {
-            MediaItemCard(
-                item = currentItem,
-                previousItem = previousItem,
-                previewItems = upcomingItems,
-                exoPlayer = exoPlayer,
-                imageLoader = imageLoader,
-                gifImageLoader = gifImageLoader,
-                onSwipeLeft = onSwipeLeft,
-                onSwipeRight = onSwipeRight,
-                onSwipeDown = onSwipeDown,
-                onSwipeToDeletePool = onSwipeToDeletePool,
-                modifier = Modifier.weight(1f),
-                sensitivity = sensitivity,
-                swipeDownAction = swipeDownAction,
-                videoPlaybackSpeed = videoPlaybackSpeed,
-                onSetVideoPlaybackSpeed = onSetVideoPlaybackSpeed,
-                isVideoMuted = isVideoMuted,
-                onToggleMute = onToggleMute,
-                onTap = onTap,
-                isPendingConversion = isPendingConversion,
-                screenshotDeletesVideo = screenshotDeletesVideo,
-                fullScreenSwipe = fullScreenSwipe,
-                onDeletePoolProgress = onDeletePoolProgress
-            )
-        }
+        MediaItemCard(
+            item = currentItem,
+            previousItem = previousItem,
+            previewItems = upcomingItems,
+            exoPlayer = exoPlayer,
+            imageLoader = imageLoader,
+            gifImageLoader = gifImageLoader,
+            onSwipeLeft = onSwipeLeft,
+            onSwipeRight = onSwipeRight,
+            onSwipeDown = onSwipeDown,
+            onSwipeToDeletePool = onSwipeToDeletePool,
+            modifier = Modifier.weight(1f),
+            sensitivity = sensitivity,
+            swipeDownAction = swipeDownAction,
+            videoPlaybackSpeed = videoPlaybackSpeed,
+            onSetVideoPlaybackSpeed = onSetVideoPlaybackSpeed,
+            isVideoMuted = isVideoMuted,
+            onToggleMute = onToggleMute,
+            onTap = onTap,
+            isPendingConversion = isPendingConversion,
+            screenshotDeletesVideo = screenshotDeletesVideo,
+            fullScreenSwipe = fullScreenSwipe,
+            onDeletePoolProgress = onDeletePoolProgress
+        )
     }
 }
 
@@ -1256,9 +1253,16 @@ private fun MediaItemCard(
         fullScreenSwipe = fullScreenSwipe,
         onDeletePoolProgress = onDeletePoolProgress,
         pageContent = { mediaItem, isCurrent, isPreview, pageModifier ->
+            val cardShape = MaterialTheme.shapes.medium
             Card(
-                modifier = pageModifier,
-                shape = MaterialTheme.shapes.medium,
+                modifier = pageModifier.graphicsLayer {
+                    shadowElevation = 6f
+                    shape = cardShape
+                    clip = false
+                    ambientShadowColor = Color.Black.copy(alpha = 0.18f)
+                    spotShadowColor = Color.Black.copy(alpha = 0.14f)
+                },
+                shape = cardShape,
                 colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                 border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -1302,12 +1306,25 @@ private fun MediaCardArtwork(
     }
 
     val loader = if (item.mimeType == "image/gif" && !isPreview) gifImageLoader else imageLoader
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
+    val previewDecodePx = remember(density, configuration) {
+        with(density) {
+            (configuration.screenWidthDp.dp.toPx() * 0.98f).toInt().coerceIn(480, 1440)
+        }
+    }
+    val imageRequest = remember(item.id, previewDecodePx) {
+        ImageRequest.Builder(context)
+            .data(item.uri)
+            .size(previewDecodePx, previewDecodePx)
+            .memoryCacheKey(item.id)
+            .diskCacheKey(item.id)
+            .build()
+    }
     Box(modifier = modifier) {
         AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(item.uri)
-                .crossfade(!isPreview)
-                .build(),
+            model = imageRequest,
             imageLoader = loader,
             contentDescription = item.displayName,
             modifier = Modifier.fillMaxSize(),

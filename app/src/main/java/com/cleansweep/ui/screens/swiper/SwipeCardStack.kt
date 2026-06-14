@@ -20,12 +20,9 @@
 package com.cleansweep.ui.screens.swiper
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
@@ -57,6 +54,7 @@ import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -64,14 +62,17 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -87,11 +88,12 @@ import com.cleansweep.data.model.MediaItem
 import com.cleansweep.data.repository.SwipeDownAction
 import com.cleansweep.data.repository.SwipeSensitivity
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.min
 
-private const val PREVIEW_REVEAL_THRESHOLD = 0.15f
+private const val PREVIEW_REVEAL_THRESHOLD = 0.10f
 /** Frozen card-stack constants — see docs/swiper-card-stack.md */
 private const val ADJACENT_CARD_MIN_SCALE = 0.92f
 private const val ADJACENT_CARD_MIN_ALPHA = 0.35f
@@ -110,7 +112,86 @@ private enum class TransitionMode {
     Dragging,
     ToNext,
     ToPrevious,
-    Cancel
+    Cancel,
+    /** Post-commit hold: keeps layer positions frozen while [item] catches up; no swipe hints. */
+    Handoff
+}
+
+/** Frozen reveal math — see docs/swiper-card-stack.md; call only from layer modifiers. */
+private fun leftRevealProgress(
+    transitionMode: TransitionMode,
+    horizontalLock: Int,
+    dragOffsetX: Float,
+    exitDistancePx: Float,
+    transitionProgress: Float,
+    cancelFromPrevious: Boolean,
+    handoffToNext: Boolean
+): Float = when {
+    transitionMode == TransitionMode.ToNext -> transitionProgress
+    transitionMode == TransitionMode.Handoff && handoffToNext -> transitionProgress
+    transitionMode == TransitionMode.Cancel && !cancelFromPrevious -> transitionProgress
+    transitionMode == TransitionMode.Dragging && horizontalLock == HORIZONTAL_NEXT ->
+        (-dragOffsetX / exitDistancePx).coerceIn(0f, 1f)
+    else -> 0f
+}
+
+private fun rightRevealProgress(
+    transitionMode: TransitionMode,
+    horizontalLock: Int,
+    dragOffsetX: Float,
+    exitDistancePx: Float,
+    transitionProgress: Float,
+    cancelFromPrevious: Boolean,
+    handoffToNext: Boolean
+): Float = when {
+    transitionMode == TransitionMode.ToPrevious -> transitionProgress
+    transitionMode == TransitionMode.Handoff && !handoffToNext -> transitionProgress
+    transitionMode == TransitionMode.Cancel && cancelFromPrevious -> transitionProgress
+    transitionMode == TransitionMode.Dragging && horizontalLock == HORIZONTAL_PREVIOUS ->
+        (dragOffsetX / exitDistancePx).coerceIn(0f, 1f)
+    else -> 0f
+}
+
+private fun isPreviousLayerOnTop(
+    transitionMode: TransitionMode,
+    horizontalLock: Int,
+    cancelFromPrevious: Boolean,
+    handoffToNext: Boolean
+): Boolean =
+    transitionMode == TransitionMode.ToPrevious ||
+        (transitionMode == TransitionMode.Handoff && !handoffToNext) ||
+        (transitionMode == TransitionMode.Cancel && cancelFromPrevious) ||
+        (transitionMode == TransitionMode.Dragging && horizontalLock == HORIZONTAL_PREVIOUS)
+
+private fun deletePoolProgressFor(
+    offsetX: Float,
+    offsetY: Float,
+    swipeThresholdPx: Float
+): Float = if (offsetX > 0f && offsetY < 0f) {
+    min(
+        offsetX / swipeThresholdPx,
+        -offsetY / (swipeThresholdPx * 0.6f)
+    ).coerceIn(0f, 1f)
+} else {
+    0f
+}
+
+@Composable
+private fun SwipeStackPage(
+    mediaItem: MediaItem,
+    isCurrent: Boolean,
+    isPreview: Boolean,
+    modifier: Modifier,
+    pageContent: @Composable (
+        mediaItem: MediaItem,
+        isCurrent: Boolean,
+        isPreview: Boolean,
+        modifier: Modifier
+    ) -> Unit
+) {
+    key(mediaItem.id) {
+        pageContent(mediaItem, isCurrent, isPreview, modifier)
+    }
 }
 
 /**
@@ -151,7 +232,6 @@ internal fun SwipeCardStack(
 ) {
     val density = LocalDensity.current
     val context = LocalContext.current
-    val swipeHintColor = MaterialTheme.colorScheme.primary
 
     var dragOffsetX by remember { mutableFloatStateOf(0f) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
@@ -166,25 +246,24 @@ internal fun SwipeCardStack(
     var showPreviousPreview by remember { mutableStateOf(false) }
     var cancelFromPrevious by remember { mutableStateOf(false) }
     var toPreviousStartProgress by remember { mutableFloatStateOf(0f) }
+    /** Holds the target card visible until [item] catches up after commit (avoids one-frame flash). */
+    var handoffItem by remember { mutableStateOf<MediaItem?>(null) }
+    var handoffToNext by remember { mutableStateOf(true) }
 
     val swipeThreshold = when (sensitivity) {
-        SwipeSensitivity.LOW -> with(density) { 60.dp.toPx() }
-        SwipeSensitivity.MEDIUM -> with(density) { 80.dp.toPx() }
-        SwipeSensitivity.HIGH -> with(density) { 140.dp.toPx() }
+        SwipeSensitivity.LOW -> with(density) { 36.dp.toPx() }
+        SwipeSensitivity.MEDIUM -> with(density) { 48.dp.toPx() }
+        SwipeSensitivity.HIGH -> with(density) { 80.dp.toPx() }
     }
     val swipeDownThreshold = swipeThreshold * 0.8f
     val transitionDistance = swipeThreshold * 2.2f
-
-    fun deletePoolProgressFor(offsetX: Float, offsetY: Float): Float {
-        return if (offsetX > 0f && offsetY < 0f) {
-            min(
-                offsetX / swipeThreshold,
-                -offsetY / (swipeThreshold * 0.6f)
-            ).coerceIn(0f, 1f)
-        } else {
-            0f
+    val configuration = LocalConfiguration.current
+    val adjacentDecodePx = remember(density, configuration) {
+        with(density) {
+            (configuration.screenWidthDp.dp.toPx() * 0.98f).toInt().coerceIn(480, 1440)
         }
     }
+    var lastReportedDeletePoolProgress by remember { mutableFloatStateOf(0f) }
 
     fun resetAllState() {
         dragOffsetX = 0f
@@ -198,12 +277,25 @@ internal fun SwipeCardStack(
         showPreviousPreview = false
         cancelFromPrevious = false
         toPreviousStartProgress = 0f
-        onDeletePoolProgress(0f)
+        handoffItem = null
+        handoffToNext = true
+        if (lastReportedDeletePoolProgress != 0f) {
+            lastReportedDeletePoolProgress = 0f
+            onDeletePoolProgress(0f)
+        }
     }
 
     LaunchedEffect(item.id) {
-        resetAllState()
+        if (handoffItem != null) return@LaunchedEffect
         transitionProgress.snapTo(0f)
+        resetAllState()
+    }
+
+    LaunchedEffect(handoffItem?.id) {
+        val targetId = handoffItem?.id ?: return@LaunchedEffect
+        snapshotFlow { item.id }.first { it == targetId }
+        transitionProgress.snapTo(0f)
+        resetAllState()
     }
 
     LaunchedEffect(nextItem?.id) {
@@ -211,6 +303,7 @@ internal fun SwipeCardStack(
             imageLoader.enqueue(
                 ImageRequest.Builder(context)
                     .data(adjacent.uri)
+                    .size(adjacentDecodePx, adjacentDecodePx)
                     .build()
             )
         }
@@ -221,6 +314,7 @@ internal fun SwipeCardStack(
             imageLoader.enqueue(
                 ImageRequest.Builder(context)
                     .data(adjacent.uri)
+                    .size(adjacentDecodePx, adjacentDecodePx)
                     .build()
             )
         }
@@ -251,8 +345,23 @@ internal fun SwipeCardStack(
         }
 
         val (cardWidth, cardHeight) = cardSizeFor(item)
-        val nextCardSize = nextItem?.let { cardSizeFor(it) }
-        val previousCardSize = previousItem?.let { cardSizeFor(it) }
+        val commitProgress = transitionProgress.value
+        val displayedNextItem = when {
+            handoffItem != null &&
+                handoffToNext &&
+                transitionMode == TransitionMode.Handoff &&
+                commitProgress >= 1f -> handoffItem
+            else -> nextItem
+        }
+        val displayedPreviousItem = when {
+            handoffItem != null &&
+                !handoffToNext &&
+                transitionMode == TransitionMode.Handoff &&
+                commitProgress >= 1f -> handoffItem
+            else -> previousItem
+        }
+        val nextCardSize = displayedNextItem?.let { cardSizeFor(it) }
+        val previousCardSize = displayedPreviousItem?.let { cardSizeFor(it) }
 
         fun edgeDistancePx(cardWidthForLayer: Dp): Float {
             return with(density) {
@@ -261,7 +370,16 @@ internal fun SwipeCardStack(
         }
 
         val exitDistancePx = edgeDistancePx(cardWidth)
-        val previousEntryLeftPx = previousCardSize?.let { (w, _) -> -edgeDistancePx(w) }
+        val deletePoolOffsetXPx = remember(density) { with(density) { 48.dp.toPx() } }
+        val deletePoolOffsetYPx = remember(density) { with(density) { 72.dp.toPx() } }
+        val scaleRange = 1f - ADJACENT_CARD_MIN_SCALE
+        val alphaRange = 1f - ADJACENT_CARD_MIN_ALPHA
+        val previousOnTop = isPreviousLayerOnTop(
+            transitionMode,
+            horizontalLock,
+            cancelFromPrevious,
+            handoffToNext
+        )
 
         val gestureModifier = Modifier.pointerInput(
             item.id,
@@ -276,25 +394,6 @@ internal fun SwipeCardStack(
                 coroutineScope {
                     val animScope = this
 
-                    suspend fun animateDragOffsetXTo(
-                        target: Float,
-                        spec: AnimationSpec<Float> = spring(dampingRatio = 0.86f, stiffness = 420f)
-                    ) {
-                        val start = dragOffsetX
-                        if (start == target) {
-                            dragOffsetX = target
-                            return
-                        }
-                        animate(
-                            initialValue = start,
-                            targetValue = target,
-                            animationSpec = spec
-                        ) { value: Float, _ ->
-                            dragOffsetX = value
-                        }
-                        dragOffsetX = target
-                    }
-
                     awaitPointerEventScope {
                         var wasDragging = false
                         var wasZooming = false
@@ -308,7 +407,9 @@ internal fun SwipeCardStack(
                         fun applyDrag(delta: Offset) {
                             if (zoomScale > 1f) return
 
-                            transitionMode = TransitionMode.Dragging
+                            if (transitionMode != TransitionMode.Dragging) {
+                                transitionMode = TransitionMode.Dragging
+                            }
 
                             if (localHorizontalLock != HORIZONTAL_NONE) {
                                 dragOffsetX += delta.x
@@ -385,7 +486,15 @@ internal fun SwipeCardStack(
                                     applyDrag(delta)
                                 }
                                 if (dragActive) {
-                                    onDeletePoolProgress(deletePoolProgressFor(dragOffsetX, dragOffsetY))
+                                    val poolProgress = deletePoolProgressFor(
+                                        dragOffsetX,
+                                        dragOffsetY,
+                                        swipeThreshold
+                                    )
+                                    if (poolProgress != lastReportedDeletePoolProgress) {
+                                        lastReportedDeletePoolProgress = poolProgress
+                                        onDeletePoolProgress(poolProgress)
+                                    }
                                     change.consume()
                                 }
                             }
@@ -403,7 +512,10 @@ internal fun SwipeCardStack(
                                 showNextPreview = false
                                 showPreviousPreview = false
                                 transitionMode = TransitionMode.Idle
-                                onDeletePoolProgress(0f)
+                                if (lastReportedDeletePoolProgress != 0f) {
+                                    lastReportedDeletePoolProgress = 0f
+                                    onDeletePoolProgress(0f)
+                                }
                             }
 
                             when {
@@ -425,9 +537,19 @@ internal fun SwipeCardStack(
                                             endDrag()
                                         } else {
                                             transitionProgress.animateTo(1f, tween(220, easing = FastOutSlowInEasing))
-                                            onSwipeLeft()
-                                            transitionProgress.snapTo(0f)
-                                            endDrag()
+                                            handoffToNext = true
+                                            handoffItem = nextItem
+                                            transitionMode = TransitionMode.Handoff
+                                            showNextPreview = false
+                                            if (!onSwipeLeft()) {
+                                                handoffItem = null
+                                                transitionMode = TransitionMode.ToNext
+                                                transitionProgress.animateTo(
+                                                    0f,
+                                                    spring(dampingRatio = 0.86f, stiffness = 420f)
+                                                )
+                                                endDrag()
+                                            }
                                         }
                                         showNextPreview = false
                                     }
@@ -452,9 +574,19 @@ internal fun SwipeCardStack(
                                                 1f,
                                                 tween(220, easing = FastOutSlowInEasing)
                                             )
-                                            onSwipeRight()
-                                            transitionProgress.snapTo(0f)
-                                            endDrag()
+                                            handoffToNext = false
+                                            handoffItem = previousItem
+                                            transitionMode = TransitionMode.Handoff
+                                            showPreviousPreview = false
+                                            if (!onSwipeRight()) {
+                                                handoffItem = null
+                                                transitionMode = TransitionMode.ToPrevious
+                                                transitionProgress.animateTo(
+                                                    0f,
+                                                    spring(dampingRatio = 0.86f, stiffness = 420f)
+                                                )
+                                                endDrag()
+                                            }
                                         }
                                         showPreviousPreview = false
                                     }
@@ -526,29 +658,11 @@ internal fun SwipeCardStack(
             }
         }
 
-        val showLeftHint = showNextPreview ||
-            transitionMode == TransitionMode.ToNext ||
-            (transitionMode == TransitionMode.Cancel && !cancelFromPrevious) ||
-            (transitionMode == TransitionMode.Dragging && horizontalLock == HORIZONTAL_NEXT)
-        val showRightHint = showPreviousPreview ||
-            transitionMode == TransitionMode.ToPrevious ||
-            (transitionMode == TransitionMode.Cancel && cancelFromPrevious) ||
-            (transitionMode == TransitionMode.Dragging && horizontalLock == HORIZONTAL_PREVIOUS)
-
-        val leftReveal = when {
-            transitionMode == TransitionMode.ToNext -> transitionProgress.value
-            transitionMode == TransitionMode.Cancel && !cancelFromPrevious -> transitionProgress.value
-            transitionMode == TransitionMode.Dragging && horizontalLock == HORIZONTAL_NEXT ->
-                (-dragOffsetX / exitDistancePx).coerceIn(0f, 1f)
-            else -> 0f
-        }
-        val rightReveal = when {
-            transitionMode == TransitionMode.ToPrevious -> transitionProgress.value
-            transitionMode == TransitionMode.Cancel && cancelFromPrevious -> transitionProgress.value
-            transitionMode == TransitionMode.Dragging && horizontalLock == HORIZONTAL_PREVIOUS ->
-                (dragOffsetX / exitDistancePx).coerceIn(0f, 1f)
-            else -> 0f
-        }
+        val showLeftHint = transitionMode != TransitionMode.Handoff &&
+            (showNextPreview ||
+                transitionMode == TransitionMode.ToNext ||
+                (transitionMode == TransitionMode.Cancel && !cancelFromPrevious) ||
+                (transitionMode == TransitionMode.Dragging && horizontalLock == HORIZONTAL_NEXT))
 
         Box(
             modifier = Modifier
@@ -556,10 +670,8 @@ internal fun SwipeCardStack(
                 .then(if (fullScreenSwipe) gestureModifier else Modifier)
         ) {
             // Next card (back layer): scales up at center while the current card slides left
-            if (nextItem != null && nextCardSize != null) {
+            if (displayedNextItem != null && nextCardSize != null) {
                 val (nextW, nextH) = nextCardSize
-                val scaleRange = 1f - ADJACENT_CARD_MIN_SCALE
-                val alphaRange = 1f - ADJACENT_CARD_MIN_ALPHA
                 Box(
                     modifier = Modifier
                         .width(nextW)
@@ -567,17 +679,32 @@ internal fun SwipeCardStack(
                         .align(Alignment.Center)
                         .zIndex(1f)
                         .graphicsLayer {
-                            val s = ADJACENT_CARD_MIN_SCALE + scaleRange * leftReveal
+                            val reveal = leftRevealProgress(
+                                transitionMode = transitionMode,
+                                horizontalLock = horizontalLock,
+                                dragOffsetX = dragOffsetX,
+                                exitDistancePx = exitDistancePx,
+                                transitionProgress = transitionProgress.value,
+                                cancelFromPrevious = cancelFromPrevious,
+                                handoffToNext = handoffToNext
+                            )
+                            val s = ADJACENT_CARD_MIN_SCALE + scaleRange * reveal
                             scaleX = s
                             scaleY = s
-                            alpha = if (leftReveal > 0f) {
-                                (ADJACENT_CARD_MIN_ALPHA + alphaRange * leftReveal).coerceIn(0f, 1f)
+                            alpha = if (reveal > 0f) {
+                                (ADJACENT_CARD_MIN_ALPHA + alphaRange * reveal).coerceIn(0f, 1f)
                             } else {
                                 0f
                             }
                         }
                 ) {
-                    pageContent(nextItem, false, true, Modifier.fillMaxSize())
+                    SwipeStackPage(
+                        mediaItem = displayedNextItem,
+                        isCurrent = false,
+                        isPreview = true,
+                        modifier = Modifier.fillMaxSize(),
+                        pageContent = pageContent
+                    )
                 }
             }
 
@@ -587,21 +714,55 @@ internal fun SwipeCardStack(
                     .width(cardWidth)
                     .height(cardHeight)
                     .align(Alignment.Center)
-                    .zIndex(if (rightReveal > 0f) 2f else 3f)
+                    .zIndex(if (previousOnTop) 2f else 3f)
                     .then(if (!fullScreenSwipe) gestureModifier else Modifier)
+                    .then(
+                        if (showLeftHint) {
+                            Modifier.drawBehind {
+                                val reveal = leftRevealProgress(
+                                    transitionMode = transitionMode,
+                                    horizontalLock = horizontalLock,
+                                    dragOffsetX = dragOffsetX,
+                                    exitDistancePx = exitDistancePx,
+                                    transitionProgress = transitionProgress.value,
+                                    cancelFromPrevious = cancelFromPrevious,
+                                    handoffToNext = handoffToNext
+                                )
+                                val intensity = (reveal * (1f - reveal) * 4f * 0.22f).coerceIn(0f, 0.22f)
+                                if (intensity > 0f) {
+                                    drawRect(
+                                        brush = Brush.horizontalGradient(
+                                            0f to Color.Black.copy(alpha = intensity),
+                                            0.35f to Color.Black.copy(alpha = intensity * 0.1f),
+                                            1f to Color.Transparent,
+                                            startX = 0f,
+                                            endX = size.width * 0.38f
+                                        )
+                                    )
+                                }
+                            }
+                        } else {
+                            Modifier
+                        }
+                    )
                     .graphicsLayer {
                         val offsetX = dragOffsetX
                         val offsetY = dragOffsetY
                         val progress = transitionProgress.value
-
-                        val deletePoolProgress = if (offsetX > 0f && offsetY < 0f) {
-                            min(
-                                offsetX / swipeThreshold,
-                                -offsetY / (swipeThreshold * 0.6f)
-                            ).coerceIn(0f, 1f)
-                        } else {
-                            0f
-                        }
+                        val rightReveal = rightRevealProgress(
+                            transitionMode = transitionMode,
+                            horizontalLock = horizontalLock,
+                            dragOffsetX = offsetX,
+                            exitDistancePx = exitDistancePx,
+                            transitionProgress = progress,
+                            cancelFromPrevious = cancelFromPrevious,
+                            handoffToNext = handoffToNext
+                        )
+                        val deletePoolProgress = deletePoolProgressFor(
+                            offsetX,
+                            offsetY,
+                            swipeThreshold
+                        )
 
                         if (zoomScale > 1f) {
                             translationX = zoomPanX
@@ -611,13 +772,11 @@ internal fun SwipeCardStack(
                             return@graphicsLayer
                         }
 
-                        val scaleRange = 1f - ADJACENT_CARD_MIN_SCALE
-                        val alphaRange = 1f - ADJACENT_CARD_MIN_ALPHA
-
                         translationX = when {
                             deletePoolProgress > 0f ->
-                                offsetX * 0.5f + with(density) { 48.dp.toPx() } * deletePoolProgress
-                            transitionMode == TransitionMode.ToNext ->
+                                offsetX * 0.5f + deletePoolOffsetXPx * deletePoolProgress
+                            transitionMode == TransitionMode.ToNext ||
+                                (transitionMode == TransitionMode.Handoff && handoffToNext) ->
                                 -exitDistancePx * progress
                             transitionMode == TransitionMode.Cancel && !cancelFromPrevious ->
                                 -exitDistancePx * progress
@@ -628,7 +787,7 @@ internal fun SwipeCardStack(
                         }
                         translationY = when {
                             deletePoolProgress > 0f ->
-                                offsetY * 0.5f - with(density) { 72.dp.toPx() } * deletePoolProgress
+                                offsetY * 0.5f - deletePoolOffsetYPx * deletePoolProgress
                             transitionMode == TransitionMode.Dragging && horizontalLock != HORIZONTAL_NONE -> 0f
                             else -> offsetY
                         }
@@ -639,15 +798,17 @@ internal fun SwipeCardStack(
                                 ADJACENT_CARD_MIN_SCALE + scaleRange * (1f - rightReveal)
                             else -> 1f
                         }
-                        scaleX = transitionScale * zoomScale.let { if (it > 1f) it else 1f }
-                        scaleY = scaleX
-                        if (zoomScale <= 1f) {
-                            scaleX = transitionScale
-                            scaleY = transitionScale
-                        }
+                        scaleX = transitionScale
+                        scaleY = transitionScale
                         alpha = when {
                             deletePoolProgress > 0f ->
                                 (1f - 0.35f * deletePoolProgress).coerceAtLeast(0.6f)
+                            (transitionMode == TransitionMode.ToNext ||
+                                (transitionMode == TransitionMode.Handoff && handoffToNext)) &&
+                                progress >= 1f -> 0f
+                            (transitionMode == TransitionMode.ToPrevious ||
+                                (transitionMode == TransitionMode.Handoff && !handoffToNext)) &&
+                                progress >= 1f -> 0f
                             rightReveal > 0f ->
                                 (1f - alphaRange * rightReveal).coerceIn(ADJACENT_CARD_MIN_ALPHA, 1f)
                             else -> 1f
@@ -656,26 +817,15 @@ internal fun SwipeCardStack(
                         clip = false
                     }
             ) {
-                pageContent(item, true, false, Modifier.fillMaxSize())
+                SwipeStackPage(
+                    mediaItem = item,
+                    isCurrent = true,
+                    isPreview = false,
+                    modifier = Modifier.fillMaxSize(),
+                    pageContent = pageContent
+                )
 
                 if (showLeftHint) {
-                    Canvas(Modifier.fillMaxSize()) {
-                        val hintAlpha = when {
-                            transitionMode == TransitionMode.ToNext ||
-                                transitionMode == TransitionMode.Cancel -> transitionProgress.value
-                            else -> (-dragOffsetX / exitDistancePx).coerceIn(0f, 1f)
-                        }
-                        val intensity = (hintAlpha * 0.7f).coerceAtMost(0.7f)
-                        drawRect(
-                            brush = Brush.radialGradient(
-                                0.0f to swipeHintColor.copy(alpha = intensity),
-                                0.15f to swipeHintColor.copy(alpha = intensity * 0.2f),
-                                1.0f to Color.Transparent,
-                                center = Offset(0f, size.height),
-                                radius = size.maxDimension * (1.0f + hintAlpha)
-                            )
-                        )
-                    }
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
                         contentDescription = stringResource(R.string.next_image),
@@ -684,11 +834,15 @@ internal fun SwipeCardStack(
                             .align(Alignment.CenterStart)
                             .padding(start = 20.dp)
                             .graphicsLayer {
-                                alpha = when {
-                                    transitionMode == TransitionMode.ToNext ||
-                                        transitionMode == TransitionMode.Cancel -> transitionProgress.value
-                                    else -> (-dragOffsetX / exitDistancePx).coerceIn(0f, 1f)
-                                }
+                                alpha = leftRevealProgress(
+                                    transitionMode = transitionMode,
+                                    horizontalLock = horizontalLock,
+                                    dragOffsetX = dragOffsetX,
+                                    exitDistancePx = exitDistancePx,
+                                    transitionProgress = transitionProgress.value,
+                                    cancelFromPrevious = cancelFromPrevious,
+                                    handoffToNext = handoffToNext
+                                )
                             }
                     )
                 }
@@ -706,7 +860,7 @@ internal fun SwipeCardStack(
             }
 
             // Previous card: slides in from the left on top — exact reverse of the current card exiting left
-            if (previousItem != null && previousCardSize != null) {
+            if (displayedPreviousItem != null && previousCardSize != null) {
                 val (prevW, prevH) = previousCardSize
                 val previousExitLeftPx = -exitDistancePx
                 Box(
@@ -714,15 +868,30 @@ internal fun SwipeCardStack(
                         .width(prevW)
                         .height(prevH)
                         .align(Alignment.Center)
-                        .zIndex(if (rightReveal > 0f) 3f else 0.5f)
+                        .zIndex(if (previousOnTop) 3f else 0.5f)
                         .graphicsLayer {
-                            translationX = previousExitLeftPx * (1f - rightReveal)
+                            val reveal = rightRevealProgress(
+                                transitionMode = transitionMode,
+                                horizontalLock = horizontalLock,
+                                dragOffsetX = dragOffsetX,
+                                exitDistancePx = exitDistancePx,
+                                transitionProgress = transitionProgress.value,
+                                cancelFromPrevious = cancelFromPrevious,
+                                handoffToNext = handoffToNext
+                            )
+                            translationX = previousExitLeftPx * (1f - reveal)
                             scaleX = 1f
                             scaleY = 1f
-                            alpha = if (rightReveal > 0f) 1f else 0f
+                            alpha = if (reveal > 0f) 1f else 0f
                         }
                 ) {
-                    pageContent(previousItem, false, true, Modifier.fillMaxSize())
+                    SwipeStackPage(
+                        mediaItem = displayedPreviousItem,
+                        isCurrent = false,
+                        isPreview = true,
+                        modifier = Modifier.fillMaxSize(),
+                        pageContent = pageContent
+                    )
                 }
             }
 
