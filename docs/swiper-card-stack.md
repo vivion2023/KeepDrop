@@ -65,9 +65,13 @@ rightReveal = ( dragOffsetX / exitDistancePx)  // finger moves right
 - **Cancel left:** `Cancel` + `cancelFromPrevious = false`, snap current back from partial left exit.
 - **Cancel right:** `Cancel` + `cancelFromPrevious = true`, snap previous back off-screen left, current scale/alpha restore.
 
-## Delete pool (orthogonal)
+## Diagonal drag (orthogonal — separate doc)
 
-Diagonal up-right swipe is separate from browse. Does not alter `leftReveal` / `rightReveal` rules above.
+**Full spec:** [`docs/swiper-diagonal-drag.md`](swiper-diagonal-drag.md)
+
+Diagonal / free drag, delete-pool fly, and planned album-transfer gestures are **not** part of this frozen browse spec. They use `freeDragEnabled`, distance-based scale, and separate release handlers.
+
+**Do not** change `leftReveal` / `rightReveal` or horizontal commit/cancel when working on diagonal features.
 
 ## Performance (drag path)
 

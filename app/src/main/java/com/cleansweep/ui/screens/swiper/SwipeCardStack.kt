@@ -15,6 +15,9 @@
  * Idle: adjacent cards preloaded but alpha = 0.
  *
  * Progress for drag and commit uses exitDistancePx so release does not jump.
+ *
+ * Diagonal / delete-pool / album-prep drag is specified in docs/swiper-diagonal-drag.md.
+ * Do not fold that logic into left/right browse without explicit approval.
  */
 
 package com.cleansweep.ui.screens.swiper
@@ -104,6 +107,12 @@ private const val HORIZONTAL_DOMINANCE_RATIO = 2.2f
 private const val DELETE_FLY_TARGET_SCALE = 0f
 private const val DRAG_ROTATION_MAX_DEG = 6f
 private const val DRAG_ROTATION_REFERENCE_MULTIPLIER = 2.8f
+/** Free diagonal drag: scale/alpha falloff vs distance from center — docs/swiper-diagonal-drag.md */
+private const val FREE_DRAG_SCALE_MAX_DROP = 0.22f
+private const val FREE_DRAG_ALPHA_MAX_DROP = 0.28f
+private const val FREE_DRAG_ALPHA_FLOOR = 0.55f
+private const val FREE_DRAG_ALPHA_MIN = 0.72f
+private const val FREE_DRAG_DISTANCE_DEAD_ZONE_SQ = 100f
 /** Frozen card-stack constants — see docs/swiper-card-stack.md */
 private const val ADJACENT_CARD_MIN_SCALE = 0.92f
 private const val ADJACENT_CARD_MIN_ALPHA = 0.35f
@@ -199,12 +208,46 @@ private fun deleteFlyShrinkProgress(flyT: Float): Float {
     return t * t
 }
 
+/** 0 at center; ~1 at [referencePx]; shared by free-drag scale, alpha, and rotation. */
+private fun freeDragDistanceProgress(
+    offsetX: Float,
+    offsetY: Float,
+    referencePx: Float
+): Float {
+    if (referencePx <= 0f) return 0f
+    val distSq = offsetX * offsetX + offsetY * offsetY
+    if (distSq < FREE_DRAG_DISTANCE_DEAD_ZONE_SQ) return 0f
+    return (sqrt(distSq) / referencePx).coerceIn(0f, 1f)
+}
+
+private fun freeDragScaleFor(offsetX: Float, offsetY: Float, referencePx: Float): Float {
+    val eased = freeDragDistanceProgress(offsetX, offsetY, referencePx)
+    val t = eased * eased
+    return 1f - FREE_DRAG_SCALE_MAX_DROP * t
+}
+
+private fun freeDragAlphaFor(
+    offsetX: Float,
+    offsetY: Float,
+    referencePx: Float,
+    swipeThresholdPx: Float
+): Float {
+    val eased = freeDragDistanceProgress(offsetX, offsetY, referencePx)
+    val t = eased * eased
+    val distanceAlpha = (1f - FREE_DRAG_ALPHA_MAX_DROP * t).coerceAtLeast(FREE_DRAG_ALPHA_MIN)
+    val poolProgress = deletePoolProgressFor(offsetX, offsetY, swipeThresholdPx)
+    return if (poolProgress > 0f) {
+        min(distanceAlpha, (1f - 0.3f * poolProgress).coerceAtLeast(FREE_DRAG_ALPHA_FLOOR))
+    } else {
+        distanceAlpha
+    }
+}
+
 /** Upright at center; tilt grows with distance from origin, capped subtly. */
 private fun dragRotationZ(offsetX: Float, offsetY: Float, referencePx: Float): Float {
     if (referencePx <= 0f) return 0f
-    val distSq = offsetX * offsetX + offsetY * offsetY
-    if (distSq < 100f) return 0f
-    val outward = (sqrt(distSq) / referencePx).coerceIn(0f, 1f)
+    val outward = freeDragDistanceProgress(offsetX, offsetY, referencePx)
+    if (outward <= 0f) return 0f
     val amount = outward * outward * DRAG_ROTATION_MAX_DEG
     val horizontalBias = (offsetX / referencePx).coerceIn(-1f, 1f)
     return horizontalBias * amount
@@ -636,9 +679,17 @@ internal fun SwipeCardStack(
                                         swipeThreshold
                                     )
                                     gesture.deleteFlyStartOffset = Offset(offsetX, offsetY)
-                                    gesture.deleteFlyStartScale = 1f - 0.2f * poolProgress
-                                    gesture.deleteFlyStartAlpha =
-                                        (1f - 0.3f * poolProgress).coerceAtLeast(0.55f)
+                                    gesture.deleteFlyStartScale = freeDragScaleFor(
+                                        offsetX,
+                                        offsetY,
+                                        dragRotationReferencePx
+                                    )
+                                    gesture.deleteFlyStartAlpha = freeDragAlphaFor(
+                                        offsetX,
+                                        offsetY,
+                                        dragRotationReferencePx,
+                                        swipeThreshold
+                                    )
                                     gesture.deleteFlyStartRotation = dragRotationZ(
                                         offsetX,
                                         offsetY,
@@ -1023,11 +1074,6 @@ private fun BoxScope.CurrentCardLayer(
                     cancelFromPrevious = gesture.cancelFromPrevious,
                     handoffToNext = gesture.handoffToNext
                 )
-                val deletePoolProgress = if (gesture.freeDragEnabled) {
-                    deletePoolProgressFor(offsetX, offsetY, swipeThreshold)
-                } else {
-                    0f
-                }
                 val flyT = gesture.deleteFlyProgress.value
                 val isFreeDragging = gesture.transitionMode == TransitionMode.Dragging &&
                     gesture.freeDragEnabled
@@ -1066,7 +1112,8 @@ private fun BoxScope.CurrentCardLayer(
                 val transitionScale = when {
                     isDeletePoolFlying ->
                         lerp(gesture.deleteFlyStartScale, DELETE_FLY_TARGET_SCALE, flyShrinkT)
-                    deletePoolProgress > 0f -> 1f - 0.2f * deletePoolProgress
+                    isFreeDragging ->
+                        freeDragScaleFor(offsetX, offsetY, dragRotationReferencePx)
                     rightReveal > 0f ->
                         ADJACENT_CARD_MIN_SCALE + scaleRange * (1f - rightReveal)
                     else -> 1f
@@ -1076,8 +1123,13 @@ private fun BoxScope.CurrentCardLayer(
                 alpha = when {
                     isDeletePoolFlying ->
                         lerp(gesture.deleteFlyStartAlpha, 0f, flyShrinkT)
-                    deletePoolProgress > 0f ->
-                        (1f - 0.3f * deletePoolProgress).coerceAtLeast(0.55f)
+                    isFreeDragging ->
+                        freeDragAlphaFor(
+                            offsetX,
+                            offsetY,
+                            dragRotationReferencePx,
+                            swipeThreshold
+                        )
                     (gesture.transitionMode == TransitionMode.ToNext ||
                         (gesture.transitionMode == TransitionMode.Handoff && gesture.handoffToNext)) &&
                         progress >= 1f -> 0f
@@ -1091,7 +1143,7 @@ private fun BoxScope.CurrentCardLayer(
                 rotationZ = when {
                     isDeletePoolFlying ->
                         lerp(gesture.deleteFlyStartRotation, 0f, flyT)
-                    isFreeDragging || deletePoolProgress > 0f ->
+                    isFreeDragging ->
                         dragRotationZ(offsetX, offsetY, dragRotationReferencePx)
                     else -> 0f
                 }
