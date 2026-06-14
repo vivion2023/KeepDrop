@@ -49,8 +49,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -75,6 +77,7 @@ internal fun OrganizeTopBar(
     onClose: () -> Unit,
     onDeletePoolClick: () -> Unit,
     deletePoolSwipeProgress: Float,
+    onTrashIconCenterInWindow: (Offset) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val trashScale = 1f + 0.22f * deletePoolSwipeProgress.coerceIn(0f, 1f)
@@ -137,10 +140,18 @@ internal fun OrganizeTopBar(
         ) {
             IconButton(
                 onClick = onDeletePoolClick,
-                modifier = Modifier.graphicsLayer {
-                    scaleX = trashScale
-                    scaleY = trashScale
-                }
+                modifier = Modifier
+                    .onGloballyPositioned { coordinates ->
+                        val center = Offset(
+                            coordinates.size.width / 2f,
+                            coordinates.size.height / 2f
+                        )
+                        onTrashIconCenterInWindow(coordinates.localToWindow(center))
+                    }
+                    .graphicsLayer {
+                        scaleX = trashScale
+                        scaleY = trashScale
+                    }
             ) {
                 Icon(
                     Icons.Default.DeleteOutline,

@@ -137,7 +137,6 @@ fun SwiperScreen(
     val folderSearchState by viewModel.folderSearchManager.state.collectAsState()
     val focusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
-    var deletePoolSwipeProgress by remember { mutableFloatStateOf(0f) }
     var showUsageDialog by remember { mutableStateOf(false) }
 
     BackHandler {
@@ -405,71 +404,41 @@ fun SwiperScreen(
                         }
                     } else {
                         val currentItem = uiState.currentItem!!
-                        Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                            OrganizeTopBar(
-                                albumName = currentItem.bucketName,
-                                deletePoolCount = uiState.toDelete.size,
-                                onClose = viewModel::onNavigateUp,
-                                onDeletePoolClick = viewModel::showSummarySheet,
-                                deletePoolSwipeProgress = deletePoolSwipeProgress
-                            )
-                            OrganizeMediaMetaLine(
-                                currentIndex = uiState.currentIndex + 1,
-                                totalCount = uiState.allMediaItems.size,
-                                dateTimestampMs = currentItem.dateModified
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .zIndex(1f)
-                            ) {
-                                MainContent(
-                                    modifier = Modifier.fillMaxSize(),
-                                    currentItem = currentItem,
-                                    previousItem = viewModel.getPreviousBrowsableItem(),
-                                    upcomingItems = viewModel.getUpcomingBrowsableItems(2),
-                                    exoPlayer = exoPlayer,
-                                    imageLoader = viewModel.imageLoader,
-                                    gifImageLoader = viewModel.gifImageLoader,
-                                    onSwipeLeft = viewModel::handleSwipeLeft,
-                                    onSwipeRight = viewModel::handleSwipeRight,
-                                    onSwipeDown = viewModel::handleSwipeDown,
-                                    onSwipeToDeletePool = viewModel::handleDelete,
-                                    sensitivity = swipeSensitivity,
-                                    swipeDownAction = swipeDownAction,
-                                    videoPlaybackSpeed = uiState.videoPlaybackSpeed,
-                                    onSetVideoPlaybackSpeed = viewModel::setPlaybackSpeed,
-                                    isVideoMuted = uiState.isVideoMuted,
-                                    onToggleMute = {
-                                        val hasAudio = exoPlayer.currentTracks.isTypeSupported(C.TRACK_TYPE_AUDIO)
-                                        viewModel.toggleMute(hasAudio)
-                                    },
-                                    onTap = {
-                                        if (it.isVideo) {
-                                            if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
-                                        }
-                                    },
-                                    isPendingConversion = uiState.isCurrentItemPendingConversion,
-                                    screenshotDeletesVideo = screenshotDeletesVideo,
-                                    folderNameLayout = FolderNameLayout.BELOW,
-                                    fullScreenSwipe = uiState.fullScreenSwipe,
-                                    onDeletePoolProgress = { deletePoolSwipeProgress = it }
-                                )
-                            }
-                            OrganizeActionBar(
-                                onNext = viewModel::handleSwipeLeft,
-                                onHelp = { showUsageDialog = true },
-                                onShare = viewModel::shareCurrentItem,
-                                onClear = viewModel::handleDelete
-                            )
-                            OrganizeFolderTransferSection(
-                                targetFolders = uiState.targetFolders,
-                                currentItem = currentItem,
-                                targetFavorites = uiState.targetFavorites,
-                                onSelectFolder = viewModel::moveToFolder,
-                                onCreateNewAlbum = viewModel::showAddTargetFolderDialog
-                            )
-                        }
+                        OrganizePhoneLayout(
+                            currentItem = currentItem,
+                            currentIndex = uiState.currentIndex,
+                            totalCount = uiState.allMediaItems.size,
+                            deletePoolCount = uiState.toDelete.size,
+                            targetFolders = uiState.targetFolders,
+                            targetFavorites = uiState.targetFavorites,
+                            exoPlayer = exoPlayer,
+                            imageLoader = viewModel.imageLoader,
+                            gifImageLoader = viewModel.gifImageLoader,
+                            previousItem = viewModel.getPreviousBrowsableItem(),
+                            upcomingItems = viewModel.getUpcomingBrowsableItems(2),
+                            onSwipeLeft = viewModel::handleSwipeLeft,
+                            onSwipeRight = viewModel::handleSwipeRight,
+                            onSwipeDown = viewModel::handleSwipeDown,
+                            onSwipeToDeletePool = viewModel::handleDelete,
+                            onNavigateUp = viewModel::onNavigateUp,
+                            onDeletePoolClick = viewModel::showSummarySheet,
+                            onShare = viewModel::shareCurrentItem,
+                            onMoveToFolder = viewModel::moveToFolder,
+                            onCreateNewAlbum = viewModel::showAddTargetFolderDialog,
+                            sensitivity = swipeSensitivity,
+                            swipeDownAction = swipeDownAction,
+                            videoPlaybackSpeed = uiState.videoPlaybackSpeed,
+                            onSetVideoPlaybackSpeed = viewModel::setPlaybackSpeed,
+                            isVideoMuted = uiState.isVideoMuted,
+                            onToggleMute = {
+                                val hasAudio = exoPlayer.currentTracks.isTypeSupported(C.TRACK_TYPE_AUDIO)
+                                viewModel.toggleMute(hasAudio)
+                            },
+                            isPendingConversion = uiState.isCurrentItemPendingConversion,
+                            screenshotDeletesVideo = screenshotDeletesVideo,
+                            fullScreenSwipe = uiState.fullScreenSwipe,
+                            onShowUsageDialog = { showUsageDialog = true }
+                        )
                     }
                 }
                 uiState.isSortingComplete && uiState.pendingChanges.isEmpty() -> {
@@ -622,6 +591,139 @@ fun SwiperScreen(
 }
 
 @Composable
+private fun OrganizePhoneLayout(
+    currentItem: MediaItem,
+    currentIndex: Int,
+    totalCount: Int,
+    deletePoolCount: Int,
+    targetFolders: List<Pair<String, String>>,
+    targetFavorites: Set<String>,
+    exoPlayer: ExoPlayer,
+    imageLoader: ImageLoader,
+    gifImageLoader: ImageLoader,
+    previousItem: MediaItem?,
+    upcomingItems: List<MediaItem>,
+    onSwipeLeft: () -> Boolean,
+    onSwipeRight: () -> Boolean,
+    onSwipeDown: () -> Unit,
+    onSwipeToDeletePool: () -> Unit,
+    onNavigateUp: () -> Unit,
+    onDeletePoolClick: () -> Unit,
+    onShare: () -> Unit,
+    onMoveToFolder: (String) -> Unit,
+    onCreateNewAlbum: () -> Unit,
+    sensitivity: SwipeSensitivity,
+    swipeDownAction: SwipeDownAction,
+    videoPlaybackSpeed: Float,
+    onSetVideoPlaybackSpeed: (Float) -> Unit,
+    isVideoMuted: Boolean,
+    onToggleMute: () -> Unit,
+    isPendingConversion: Boolean,
+    screenshotDeletesVideo: Boolean,
+    fullScreenSwipe: Boolean,
+    onShowUsageDialog: () -> Unit
+) {
+    var deletePoolSwipeProgress by remember { mutableFloatStateOf(0f) }
+    var deletePoolFlyTargetInWindow by remember { mutableStateOf<Offset?>(null) }
+    var cardStackCenterInWindow by remember { mutableStateOf<Offset?>(null) }
+    val onDeletePoolProgress = remember {
+        { progress: Float -> deletePoolSwipeProgress = progress }
+    }
+    val onTrashPositioned = remember {
+        { offset: Offset ->
+            val current = deletePoolFlyTargetInWindow
+            if (current == null || current != offset) {
+                deletePoolFlyTargetInWindow = offset
+            }
+        }
+    }
+    val onCardStackPositioned = remember {
+        { offset: Offset ->
+            val current = cardStackCenterInWindow
+            if (current == null || current != offset) {
+                cardStackCenterInWindow = offset
+            }
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        OrganizeTopBar(
+            albumName = currentItem.bucketName,
+            deletePoolCount = deletePoolCount,
+            onClose = onNavigateUp,
+            onDeletePoolClick = onDeletePoolClick,
+            deletePoolSwipeProgress = deletePoolSwipeProgress,
+            onTrashIconCenterInWindow = onTrashPositioned
+        )
+        OrganizeMediaMetaLine(
+            currentIndex = currentIndex + 1,
+            totalCount = totalCount,
+            dateTimestampMs = currentItem.dateModified
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .zIndex(1f)
+                .onGloballyPositioned { coordinates ->
+                    onCardStackPositioned(
+                        coordinates.localToWindow(
+                            Offset(
+                                coordinates.size.width / 2f,
+                                coordinates.size.height / 2f
+                            )
+                        )
+                    )
+                }
+        ) {
+            MainContent(
+                modifier = Modifier.fillMaxSize(),
+                currentItem = currentItem,
+                previousItem = previousItem,
+                upcomingItems = upcomingItems,
+                exoPlayer = exoPlayer,
+                imageLoader = imageLoader,
+                gifImageLoader = gifImageLoader,
+                onSwipeLeft = onSwipeLeft,
+                onSwipeRight = onSwipeRight,
+                onSwipeDown = onSwipeDown,
+                onSwipeToDeletePool = onSwipeToDeletePool,
+                sensitivity = sensitivity,
+                swipeDownAction = swipeDownAction,
+                videoPlaybackSpeed = videoPlaybackSpeed,
+                onSetVideoPlaybackSpeed = onSetVideoPlaybackSpeed,
+                isVideoMuted = isVideoMuted,
+                onToggleMute = onToggleMute,
+                onTap = {
+                    if (it.isVideo) {
+                        if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+                    }
+                },
+                isPendingConversion = isPendingConversion,
+                screenshotDeletesVideo = screenshotDeletesVideo,
+                folderNameLayout = FolderNameLayout.BELOW,
+                fullScreenSwipe = fullScreenSwipe,
+                onDeletePoolProgress = onDeletePoolProgress,
+                deletePoolFlyTargetInWindow = deletePoolFlyTargetInWindow,
+                cardStackCenterInWindow = cardStackCenterInWindow
+            )
+        }
+        OrganizeActionBar(
+            onNext = { onSwipeLeft() },
+            onHelp = onShowUsageDialog,
+            onShare = onShare,
+            onClear = onSwipeToDeletePool
+        )
+        OrganizeFolderTransferSection(
+            targetFolders = targetFolders,
+            currentItem = currentItem,
+            targetFavorites = targetFavorites,
+            onSelectFolder = onMoveToFolder,
+            onCreateNewAlbum = onCreateNewAlbum
+        )
+    }
+}
+
+@Composable
 private fun MainContent(
     modifier: Modifier = Modifier,
     currentItem: MediaItem,
@@ -645,7 +747,9 @@ private fun MainContent(
     screenshotDeletesVideo: Boolean,
     folderNameLayout: FolderNameLayout,
     fullScreenSwipe: Boolean,
-    onDeletePoolProgress: (Float) -> Unit = {}
+    onDeletePoolProgress: (Float) -> Unit = {},
+    deletePoolFlyTargetInWindow: Offset? = null,
+    cardStackCenterInWindow: Offset? = null
 ) {
     Column(modifier) {
         if (folderNameLayout == FolderNameLayout.ABOVE) {
@@ -673,7 +777,9 @@ private fun MainContent(
             isPendingConversion = isPendingConversion,
             screenshotDeletesVideo = screenshotDeletesVideo,
             fullScreenSwipe = fullScreenSwipe,
-            onDeletePoolProgress = onDeletePoolProgress
+            onDeletePoolProgress = onDeletePoolProgress,
+            deletePoolFlyTargetInWindow = deletePoolFlyTargetInWindow,
+            cardStackCenterInWindow = cardStackCenterInWindow
         )
     }
 }
@@ -1227,8 +1333,27 @@ private fun MediaItemCard(
     isPendingConversion: Boolean,
     screenshotDeletesVideo: Boolean,
     fullScreenSwipe: Boolean,
-    onDeletePoolProgress: (Float) -> Unit = {}
+    onDeletePoolProgress: (Float) -> Unit = {},
+    deletePoolFlyTargetInWindow: Offset? = null,
+    cardStackCenterInWindow: Offset? = null
 ) {
+    val pageContent: @Composable (
+        MediaItem,
+        Boolean,
+        Boolean,
+        Modifier
+    ) -> Unit = remember(exoPlayer, imageLoader, gifImageLoader) {
+        { mediaItem, _, isPreview, pageModifier ->
+            SwipeCardPageContent(
+                mediaItem = mediaItem,
+                exoPlayer = exoPlayer,
+                imageLoader = imageLoader,
+                gifImageLoader = gifImageLoader,
+                isPreview = isPreview,
+                modifier = pageModifier
+            )
+        }
+    }
     SwipeCardStack(
         item = item,
         previousItem = previousItem,
@@ -1251,40 +1376,52 @@ private fun MediaItemCard(
         isPendingConversion = isPendingConversion,
         screenshotDeletesVideo = screenshotDeletesVideo,
         fullScreenSwipe = fullScreenSwipe,
+        deletePoolFlyTargetInWindow = deletePoolFlyTargetInWindow,
+        cardStackCenterInWindow = cardStackCenterInWindow,
         onDeletePoolProgress = onDeletePoolProgress,
-        pageContent = { mediaItem, isCurrent, isPreview, pageModifier ->
-            val cardShape = MaterialTheme.shapes.medium
-            Card(
-                modifier = pageModifier.graphicsLayer {
-                    shadowElevation = 6f
-                    shape = cardShape
-                    clip = false
-                    ambientShadowColor = Color.Black.copy(alpha = 0.18f)
-                    spotShadowColor = Color.Black.copy(alpha = 0.14f)
-                },
-                shape = cardShape,
-                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Transparent)
-                        .clip(MaterialTheme.shapes.medium)
-                ) {
-                    MediaCardArtwork(
-                        item = mediaItem,
-                        exoPlayer = exoPlayer,
-                        imageLoader = imageLoader,
-                        gifImageLoader = gifImageLoader,
-                        modifier = Modifier.fillMaxSize(),
-                        isPreview = isPreview
-                    )
-                }
-            }
-        }
+        pageContent = pageContent
     )
+}
+
+@Composable
+private fun SwipeCardPageContent(
+    mediaItem: MediaItem,
+    exoPlayer: ExoPlayer,
+    imageLoader: ImageLoader,
+    gifImageLoader: ImageLoader,
+    isPreview: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val cardShape = MaterialTheme.shapes.medium
+    Card(
+        modifier = modifier.graphicsLayer {
+            shadowElevation = 6f
+            shape = cardShape
+            clip = false
+            ambientShadowColor = Color.Black.copy(alpha = 0.18f)
+            spotShadowColor = Color.Black.copy(alpha = 0.14f)
+        },
+        shape = cardShape,
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Transparent)
+                .clip(MaterialTheme.shapes.medium)
+        ) {
+            MediaCardArtwork(
+                item = mediaItem,
+                exoPlayer = exoPlayer,
+                imageLoader = imageLoader,
+                gifImageLoader = gifImageLoader,
+                modifier = Modifier.fillMaxSize(),
+                isPreview = isPreview
+            )
+        }
+    }
 }
 
 
