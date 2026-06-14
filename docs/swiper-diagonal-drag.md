@@ -68,10 +68,19 @@ alpha = min(distanceAlpha, poolAlpha) when in delete quadrant, else distanceAlph
 
 Function: `freeDragAlphaFor()`.
 
-### Rotation
+### Rotation (trash pivot)
 
-- Upright at center; max ~6° at full reference distance.
-- `dragRotationZ()` — horizontal bias × squared distance falloff.
+- **Pivot:** trash icon center in window, mapped to `TransformOrigin` on the card layer
+  (`trashPivotOrigin()`). **Not** the card center. Same pivot for all free-drag directions
+  (upper-right delete, downward album-prep, etc.).
+- **Scale pivot:** card center (`TransformOrigin(0.5, 0.5)` on inner layer) — independent of
+  rotation pivot.
+- **Max tilt:** `DRAG_ROTATION_MAX_DEG = 15f` at full reference distance.
+- **Magnitude:** squared distance falloff from **card center** (`freeDragDistanceProgress`).
+- **Direction:** linear in `offsetX / referencePx` (smooth through x=0; **no** `atan2` — that
+  caused a π flip when crossing from upper-left to upper-right).
+- **Layers:** outer `graphicsLayer` = translation + rotation (trash pivot); inner =
+  scale + alpha (card center).
 
 ---
 

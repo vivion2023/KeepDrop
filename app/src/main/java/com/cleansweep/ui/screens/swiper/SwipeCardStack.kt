@@ -76,6 +76,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
@@ -105,7 +106,7 @@ private const val PREVIEW_REVEAL_THRESHOLD = 0.10f
 /** Horizontal browse locks only when X movement clearly dominates diagonal drag. */
 private const val HORIZONTAL_DOMINANCE_RATIO = 2.2f
 private const val DELETE_FLY_TARGET_SCALE = 0f
-private const val DRAG_ROTATION_MAX_DEG = 6f
+private const val DRAG_ROTATION_MAX_DEG = 15f
 private const val DRAG_ROTATION_REFERENCE_MULTIPLIER = 2.8f
 /** Free diagonal drag: scale/alpha falloff vs distance from center — docs/swiper-diagonal-drag.md */
 private const val FREE_DRAG_SCALE_MAX_DROP = 0.22f
@@ -243,14 +244,35 @@ private fun freeDragAlphaFor(
     }
 }
 
-/** Upright at center; tilt grows with distance from origin, capped subtly. */
+/**
+ * Smooth tilt during free drag — linear in [offsetX], no atan2 (avoids π flip at x=0).
+ * Magnitude grows with squared distance from card center. Pivot: [trashPivotOrigin].
+ */
 private fun dragRotationZ(offsetX: Float, offsetY: Float, referencePx: Float): Float {
     if (referencePx <= 0f) return 0f
     val outward = freeDragDistanceProgress(offsetX, offsetY, referencePx)
     if (outward <= 0f) return 0f
-    val amount = outward * outward * DRAG_ROTATION_MAX_DEG
-    val horizontalBias = (offsetX / referencePx).coerceIn(-1f, 1f)
-    return horizontalBias * amount
+    val t = outward * outward
+    val horizontalFactor = (offsetX / referencePx).coerceIn(-1f, 1f)
+    return horizontalFactor * t * DRAG_ROTATION_MAX_DEG
+}
+
+/** Pivot at trash icon center relative to the card layer (scale still uses card center). */
+private fun trashPivotOrigin(
+    layerWidthPx: Float,
+    layerHeightPx: Float,
+    trashInWindow: Offset?,
+    stackCenterInWindow: Offset?
+): TransformOrigin {
+    if (trashInWindow != null && stackCenterInWindow != null &&
+        layerWidthPx > 0f && layerHeightPx > 0f
+    ) {
+        return TransformOrigin(
+            pivotFractionX = 0.5f + (trashInWindow.x - stackCenterInWindow.x) / layerWidthPx,
+            pivotFractionY = 0.5f + (trashInWindow.y - stackCenterInWindow.y) / layerHeightPx
+        )
+    }
+    return TransformOrigin(0.88f, -0.40f)
 }
 
 private fun lerp(start: Float, end: Float, fraction: Float): Float =
@@ -921,6 +943,8 @@ internal fun SwipeCardStack(
                 alphaRange = alphaRange,
                 previousOnTop = previousOnTop,
                 gestureModifier = if (!fullScreenSwipe) gestureModifier else Modifier,
+                deletePoolFlyTargetInWindow = deletePoolFlyTargetInWindow,
+                cardStackCenterInWindow = cardStackCenterInWindow,
                 isVideoMuted = isVideoMuted,
                 onToggleMute = onToggleMute,
                 isPendingConversion = isPendingConversion,
@@ -1012,6 +1036,8 @@ private fun BoxScope.CurrentCardLayer(
     alphaRange: Float,
     previousOnTop: Boolean,
     gestureModifier: Modifier,
+    deletePoolFlyTargetInWindow: Offset?,
+    cardStackCenterInWindow: Offset?,
     isVideoMuted: Boolean,
     onToggleMute: () -> Unit,
     isPendingConversion: Boolean,
@@ -1078,13 +1104,13 @@ private fun BoxScope.CurrentCardLayer(
                 val isFreeDragging = gesture.transitionMode == TransitionMode.Dragging &&
                     gesture.freeDragEnabled
                 val isDeletePoolFlying = gesture.transitionMode == TransitionMode.DeletePoolFly
-                val flyShrinkT = deleteFlyShrinkProgress(flyT)
+                val usesTrashPivot = isFreeDragging || isDeletePoolFlying
 
                 if (gesture.zoomScale > 1f) {
                     translationX = gesture.zoomPanX
                     translationY = gesture.zoomPanY
-                    scaleX = gesture.zoomScale
-                    scaleY = gesture.zoomScale
+                    rotationZ = 0f
+                    transformOrigin = TransformOrigin(0.5f, 0.5f)
                     return@graphicsLayer
                 }
 
@@ -1108,38 +1134,6 @@ private fun BoxScope.CurrentCardLayer(
                     isFreeDragging -> offsetY
                     else -> 0f
                 }
-
-                val transitionScale = when {
-                    isDeletePoolFlying ->
-                        lerp(gesture.deleteFlyStartScale, DELETE_FLY_TARGET_SCALE, flyShrinkT)
-                    isFreeDragging ->
-                        freeDragScaleFor(offsetX, offsetY, dragRotationReferencePx)
-                    rightReveal > 0f ->
-                        ADJACENT_CARD_MIN_SCALE + scaleRange * (1f - rightReveal)
-                    else -> 1f
-                }
-                scaleX = transitionScale
-                scaleY = transitionScale
-                alpha = when {
-                    isDeletePoolFlying ->
-                        lerp(gesture.deleteFlyStartAlpha, 0f, flyShrinkT)
-                    isFreeDragging ->
-                        freeDragAlphaFor(
-                            offsetX,
-                            offsetY,
-                            dragRotationReferencePx,
-                            swipeThreshold
-                        )
-                    (gesture.transitionMode == TransitionMode.ToNext ||
-                        (gesture.transitionMode == TransitionMode.Handoff && gesture.handoffToNext)) &&
-                        progress >= 1f -> 0f
-                    (gesture.transitionMode == TransitionMode.ToPrevious ||
-                        (gesture.transitionMode == TransitionMode.Handoff && !gesture.handoffToNext)) &&
-                        progress >= 1f -> 0f
-                    rightReveal > 0f ->
-                        (1f - alphaRange * rightReveal).coerceIn(ADJACENT_CARD_MIN_ALPHA, 1f)
-                    else -> 1f
-                }
                 rotationZ = when {
                     isDeletePoolFlying ->
                         lerp(gesture.deleteFlyStartRotation, 0f, flyT)
@@ -1147,18 +1141,92 @@ private fun BoxScope.CurrentCardLayer(
                         dragRotationZ(offsetX, offsetY, dragRotationReferencePx)
                     else -> 0f
                 }
+                transformOrigin = if (usesTrashPivot) {
+                    trashPivotOrigin(
+                        layerWidthPx = size.width,
+                        layerHeightPx = size.height,
+                        trashInWindow = deletePoolFlyTargetInWindow,
+                        stackCenterInWindow = cardStackCenterInWindow
+                    )
+                } else {
+                    TransformOrigin(0.5f, 0.5f)
+                }
                 clip = false
             }
     ) {
-        SwipeStackPage(
-            mediaItem = item,
-            isCurrent = true,
-            isPreview = false,
-            modifier = Modifier.fillMaxSize(),
-            pageContent = pageContent
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val offsetX = gesture.dragOffsetX
+                    val offsetY = gesture.dragOffsetY
+                    val progress = gesture.transitionProgress.value
+                    val rightReveal = rightRevealProgress(
+                        transitionMode = gesture.transitionMode,
+                        horizontalLock = gesture.horizontalLock,
+                        dragOffsetX = offsetX,
+                        exitDistancePx = exitDistancePx,
+                        transitionProgress = progress,
+                        cancelFromPrevious = gesture.cancelFromPrevious,
+                        handoffToNext = gesture.handoffToNext
+                    )
+                    val flyT = gesture.deleteFlyProgress.value
+                    val isFreeDragging = gesture.transitionMode == TransitionMode.Dragging &&
+                        gesture.freeDragEnabled
+                    val isDeletePoolFlying = gesture.transitionMode == TransitionMode.DeletePoolFly
+                    val flyShrinkT = deleteFlyShrinkProgress(flyT)
 
-        Icon(
+                    transformOrigin = TransformOrigin(0.5f, 0.5f)
+
+                    if (gesture.zoomScale > 1f) {
+                        scaleX = gesture.zoomScale
+                        scaleY = gesture.zoomScale
+                        alpha = 1f
+                        return@graphicsLayer
+                    }
+
+                    val transitionScale = when {
+                        isDeletePoolFlying ->
+                            lerp(gesture.deleteFlyStartScale, DELETE_FLY_TARGET_SCALE, flyShrinkT)
+                        isFreeDragging ->
+                            freeDragScaleFor(offsetX, offsetY, dragRotationReferencePx)
+                        rightReveal > 0f ->
+                            ADJACENT_CARD_MIN_SCALE + scaleRange * (1f - rightReveal)
+                        else -> 1f
+                    }
+                    scaleX = transitionScale
+                    scaleY = transitionScale
+                    alpha = when {
+                        isDeletePoolFlying ->
+                            lerp(gesture.deleteFlyStartAlpha, 0f, flyShrinkT)
+                        isFreeDragging ->
+                            freeDragAlphaFor(
+                                offsetX,
+                                offsetY,
+                                dragRotationReferencePx,
+                                swipeThreshold
+                            )
+                        (gesture.transitionMode == TransitionMode.ToNext ||
+                            (gesture.transitionMode == TransitionMode.Handoff && gesture.handoffToNext)) &&
+                            progress >= 1f -> 0f
+                        (gesture.transitionMode == TransitionMode.ToPrevious ||
+                            (gesture.transitionMode == TransitionMode.Handoff && !gesture.handoffToNext)) &&
+                            progress >= 1f -> 0f
+                        rightReveal > 0f ->
+                            (1f - alphaRange * rightReveal).coerceIn(ADJACENT_CARD_MIN_ALPHA, 1f)
+                        else -> 1f
+                    }
+                }
+        ) {
+            SwipeStackPage(
+                mediaItem = item,
+                isCurrent = true,
+                isPreview = false,
+                modifier = Modifier.fillMaxSize(),
+                pageContent = pageContent
+            )
+
+            Icon(
             imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
             contentDescription = stringResource(R.string.next_image),
             tint = Color.White.copy(alpha = 0.9f),
@@ -1178,15 +1246,16 @@ private fun BoxScope.CurrentCardLayer(
                 }
         )
 
-        if (item.isVideo) {
-            VideoOverlayControls(
-                isVideoMuted = isVideoMuted,
-                onToggleMute = onToggleMute,
-                isPendingConversion = isPendingConversion,
-                screenshotDeletesVideo = screenshotDeletesVideo,
-                videoPlaybackSpeed = videoPlaybackSpeed,
-                onSetVideoPlaybackSpeed = onSetVideoPlaybackSpeed
-            )
+            if (item.isVideo) {
+                VideoOverlayControls(
+                    isVideoMuted = isVideoMuted,
+                    onToggleMute = onToggleMute,
+                    isPendingConversion = isPendingConversion,
+                    screenshotDeletesVideo = screenshotDeletesVideo,
+                    videoPlaybackSpeed = videoPlaybackSpeed,
+                    onSetVideoPlaybackSpeed = onSetVideoPlaybackSpeed
+                )
+            }
         }
     }
 }
