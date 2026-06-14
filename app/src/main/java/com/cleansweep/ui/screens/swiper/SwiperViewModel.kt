@@ -703,16 +703,12 @@ class SwiperViewModel @Inject constructor(
         }
     }
 
-    private fun isBrowsableItem(itemId: String, state: SwiperUiState): Boolean {
-        val blockedIds = sessionProcessedMediaIds +
-            (if (_rememberProcessedMediaEnabled) processedMediaIds else emptySet()) +
-            state.pendingChanges.map { it.item.id }.toSet() +
-            state.sessionSkippedMediaIds
-
-        return itemId == state.currentItem?.id || itemId !in blockedIds
-    }
-
-    private fun getAdjacentBrowsableItems(direction: Int, limit: Int): List<MediaItem> {
+    /**
+     * Horizontal swipe browse moves by list index only. Processed / pending items stay
+     * in the queue so the user can swipe back after resume (e.g. Studio refresh at #7).
+     * [processAndAdvance] still skips processed items when advancing via Keep/Delete/etc.
+     */
+    private fun getAdjacentItemsForBrowse(direction: Int, limit: Int): List<MediaItem> {
         if (direction == 0 || limit <= 0) return emptyList()
 
         val currentState = _uiState.value
@@ -726,16 +722,15 @@ class SwiperViewModel @Inject constructor(
 
         return searchRange
             .mapNotNull { index -> currentState.allMediaItems.getOrNull(index) }
-            .filter { candidate -> isBrowsableItem(candidate.id, currentState) }
             .take(limit)
     }
 
     fun getPreviousBrowsableItem(): MediaItem? {
-        return getAdjacentBrowsableItems(direction = -1, limit = 1).firstOrNull()
+        return getAdjacentItemsForBrowse(direction = -1, limit = 1).firstOrNull()
     }
 
     fun getUpcomingBrowsableItems(limit: Int): List<MediaItem> {
-        return getAdjacentBrowsableItems(direction = 1, limit = limit)
+        return getAdjacentItemsForBrowse(direction = 1, limit = limit)
     }
 
     private fun navigateToAdjacentItem(direction: Int): Boolean {
@@ -746,17 +741,11 @@ class SwiperViewModel @Inject constructor(
         _uiState.update { currentState ->
             currentState.currentItem ?: return@update currentState
 
-            val searchRange = if (direction > 0) {
-                (currentState.currentIndex + 1)..<currentState.allMediaItems.size
-            } else {
-                (currentState.currentIndex - 1) downTo 0
-            }
-
-            val targetIndex = searchRange.firstOrNull { index ->
-                currentState.allMediaItems
-                    .getOrNull(index)
-                    ?.let { candidate -> isBrowsableItem(candidate.id, currentState) } == true
-            } ?: return@update currentState
+            val targetIndex = adjacentBrowseIndex(
+                currentIndex = currentState.currentIndex,
+                direction = direction,
+                listSize = currentState.allMediaItems.size
+            ) ?: return@update currentState
 
             navigated = true
 
