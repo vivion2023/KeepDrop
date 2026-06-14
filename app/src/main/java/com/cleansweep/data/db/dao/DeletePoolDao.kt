@@ -44,6 +44,9 @@ interface DeletePoolDao {
     @Query("DELETE FROM delete_pool_entries WHERE mediaKey = :mediaKey AND status = :status")
     suspend fun deleteByMediaKeyAndStatus(mediaKey: String, status: String)
 
+    @Query("DELETE FROM delete_pool_entries WHERE status = :status")
+    suspend fun deleteAllByStatus(status: String)
+
     @Query("DELETE FROM delete_pool_entries WHERE entryId IN (:entryIds)")
     suspend fun deleteByIds(entryIds: List<String>)
 

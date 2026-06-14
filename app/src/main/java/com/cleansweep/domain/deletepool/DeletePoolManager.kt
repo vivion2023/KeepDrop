@@ -41,6 +41,10 @@ class DeletePoolManager @Inject constructor(
         deletePoolRepository.removeActive(item.mediaKey())
     }
 
+    suspend fun clearAllActive() {
+        deletePoolRepository.clearAllActive()
+    }
+
     suspend fun getActiveMediaKeys(): Set<String> {
         return deletePoolRepository.getActiveMediaKeys()
     }

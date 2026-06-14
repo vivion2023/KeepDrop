@@ -1432,7 +1432,21 @@ class SwiperViewModel @Inject constructor(
         viewModelScope.launch {
             logJitSummary()
             sessionHiddenTargetFolders.value = emptySet()
-            _uiState.update { it.copy(showConfirmExitDialog = false) }
+            discardAllPendingChangesAndDeletePool()
+            _uiState.update { currentState ->
+                val emptyChanges = emptyList<PendingChange>()
+                val summary = processSummaryLists(emptyChanges, currentState.folderIdToNameMap)
+                currentState.copy(
+                    showConfirmExitDialog = false,
+                    pendingChanges = emptyChanges,
+                    showSummarySheet = false,
+                    isCurrentItemPendingConversion = false,
+                    toDelete = summary.toDelete,
+                    toKeep = summary.toKeep,
+                    toConvert = summary.toConvert,
+                    groupedMoves = summary.groupedMoves
+                )
+            }
             _navigationEvent.emit(NavigationEvent.NavigateUp)
         }
     }
@@ -1523,14 +1537,19 @@ class SwiperViewModel @Inject constructor(
 
 
     fun resetPendingChanges() {
-        val deleteChanges = _uiState.value.pendingChanges.filter { it.action is SwiperAction.Delete }
-        if (deleteChanges.isNotEmpty()) {
-            val deleteKeys = deleteChanges.map { it.item.mediaKey() }.toSet()
-            deletePoolMediaKeys = deletePoolMediaKeys - deleteKeys
-            viewModelScope.launch {
-                deleteChanges.forEach { deletePoolManager.restore(it.item) }
-            }
+        viewModelScope.launch {
+            discardAllPendingChangesAndDeletePool()
+            applyStateAfterDiscardingPendingChanges()
         }
+    }
+
+    private suspend fun discardAllPendingChangesAndDeletePool() {
+        deletePoolManager.clearAllActive()
+        deletePoolMediaKeys = emptySet()
+        savedStateHandle["pendingChanges"] = null
+    }
+
+    private fun applyStateAfterDiscardingPendingChanges() {
         _uiState.update { currentState ->
             val emptyChanges = emptyList<PendingChange>()
             val summary = processSummaryLists(emptyChanges, currentState.folderIdToNameMap)

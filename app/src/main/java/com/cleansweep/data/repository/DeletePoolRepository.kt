@@ -55,6 +55,10 @@ class DeletePoolRepository @Inject constructor(
         deletePoolDao.deleteByMediaKeyAndStatus(mediaKey, DeletePoolStatus.IN_POOL)
     }
 
+    suspend fun clearAllActive() = withContext(Dispatchers.IO) {
+        deletePoolDao.deleteAllByStatus(DeletePoolStatus.IN_POOL)
+    }
+
     suspend fun removeActiveByIds(entryIds: List<String>) = withContext(Dispatchers.IO) {
         if (entryIds.isNotEmpty()) {
             deletePoolDao.deleteByIds(entryIds)
