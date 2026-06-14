@@ -124,8 +124,6 @@ data class SwiperUiState(
     val isFolderBarExpanded: Boolean = false,
     val useLegacyFolderIcons: Boolean = false,
     val folderMenuState: FolderMenuState = FolderMenuState.Hidden,
-    val showMediaItemMenu: Boolean = false,
-    val mediaItemMenuOffset: DpOffset = DpOffset.Zero,
     val videoPlaybackPosition: Long = 0L,
     val videoPlaybackSpeed: Float = 1.0f,
     val isVideoMuted: Boolean = true,
@@ -865,7 +863,6 @@ class SwiperViewModel @Inject constructor(
                     }
                 }
             }
-            dismissMediaItemMenu()
         }
     }
 
@@ -898,7 +895,6 @@ class SwiperViewModel @Inject constructor(
             } else {
                 _uiState.update { it.copy(toastMessage = context.getString(R.string.could_not_find_parent)) }
             }
-            dismissMediaItemMenu()
         }
     }
 
@@ -1343,17 +1339,8 @@ class SwiperViewModel @Inject constructor(
     }
 
 
-    fun showMediaItemMenu(offset: DpOffset) {
-        _uiState.update { it.copy(showMediaItemMenu = true, mediaItemMenuOffset = offset) }
-    }
-
-    fun dismissMediaItemMenu() {
-        _uiState.update { it.copy(showMediaItemMenu = false) }
-    }
-
     fun shareCurrentItem() {
         val currentItem = _uiState.value.currentItem ?: return
-        dismissMediaItemMenu()
 
         val shareUri = if (currentItem.uri.scheme == "file") {
             try {
@@ -1385,7 +1372,6 @@ class SwiperViewModel @Inject constructor(
 
     fun openCurrentItem() {
         val currentItem = _uiState.value.currentItem ?: return
-        dismissMediaItemMenu()
         val viewUri = if (currentItem.uri.scheme == "file") {
             try {
                 val file = File(currentItem.id)

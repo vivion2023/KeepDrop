@@ -12,6 +12,7 @@ plugins {
 
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
+    arg("room.incremental", "true")
 }
 
 android {
@@ -102,17 +103,9 @@ androidComponents {
     }
 }
 
-// Configure Kotlin compiler to output more warnings
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    compilerOptions {
-        // Enable reporting of unused code for optimization purposes
-        freeCompilerArgs.add("-Xreport-unused-for-optimization")
-        // Enable all Kotlin compiler lint warnings
-        freeCompilerArgs.add("-Xlint:all")
-    }
+hilt {
+    enableAggregatingTask = true
 }
-
-
 
 // Minimal configuration for the AboutLibraries plugin.
 // This enables the plugin to scan dependencies and generate license data.
@@ -159,6 +152,8 @@ dependencies {
     implementation("androidx.room:room-runtime:2.8.4")
     ksp("androidx.room:room-compiler:2.8.4")
     implementation("androidx.room:room-ktx:2.8.4")
+
+    implementation("androidx.exifinterface:exifinterface:1.4.1")
 
     // Coil
     implementation("io.coil-kt:coil-compose:2.7.0")

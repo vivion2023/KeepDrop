@@ -24,6 +24,7 @@ import android.util.Size
 import com.cleansweep.domain.repository.MediaRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -35,6 +36,11 @@ class ThumbnailPrewarmer @Inject constructor(
 ) {
     private val contentResolver = context.contentResolver
     private val logTag ="ThumbnailPrewarmer"
+
+    companion object {
+        private const val BATCH_SIZE = 50
+        private const val BATCH_DELAY_MS = 200L
+    }
 
     /**
      * A robust, multi-step process to ensure newly discovered media files are fully indexed
@@ -50,41 +56,38 @@ class ThumbnailPrewarmer @Inject constructor(
         }
 
         withContext(Dispatchers.IO) {
-            Log.d(logTag, "Starting pre-warm process for ${filePaths.size} files.")
+            Log.d(logTag, "Starting pre-warm process for ${filePaths.size} files in batches of $BATCH_SIZE.")
 
-            // Step 1: Scan files and wait for MediaStore to acknowledge them.
-            // This is critical to get a content:// URI.
-            val scanSuccess = mediaRepository.scanPathsAndWait(filePaths)
-            if (!scanSuccess) {
-                Log.e(logTag, "Pre-warm failed: scanPathsAndWait returned false.")
-                return@withContext
-            }
-            Log.d(logTag, "Scan successful. Fetching refreshed media items.")
-
-            // Step 2: Fetch the full MediaItem objects, which should now have content:// URIs.
-            val mediaItems = mediaRepository.getMediaItemsFromPaths(filePaths)
-            if (mediaItems.isEmpty()) {
-                Log.w(logTag, "Pre-warm warning: No media items found after successful scan for paths: $filePaths")
-                return@withContext
-            }
-
-            // Step 3: For each item with a content URI, explicitly load its thumbnail.
-            // This forces the system to generate and cache it if it doesn't exist.
             var prewarmedCount = 0
-            mediaItems.forEach { item ->
-                if (item.uri.scheme == "content") {
-                    try {
-                        // The size is a standard thumbnail size. We discard the result;
-                        // the act of calling this method forces the generation.
-                        contentResolver.loadThumbnail(item.uri, Size(256, 256), null)
-                        prewarmedCount++
-                    } catch (e: Exception) {
-                        // This can happen if the file is corrupt, already deleted, etc.
-                        Log.w(logTag, "Failed to pre-warm thumbnail for ${item.id}", e)
+            filePaths.chunked(BATCH_SIZE).forEachIndexed { batchIndex, batch ->
+                if (batchIndex > 0) {
+                    delay(BATCH_DELAY_MS)
+                }
+
+                val scanSuccess = mediaRepository.scanPathsAndWait(batch)
+                if (!scanSuccess) {
+                    Log.e(logTag, "Pre-warm failed for batch $batchIndex: scanPathsAndWait returned false.")
+                    return@forEachIndexed
+                }
+
+                val mediaItems = mediaRepository.getMediaItemsFromPaths(batch)
+                if (mediaItems.isEmpty()) {
+                    Log.w(logTag, "Pre-warm warning: No media items found after scan for batch $batchIndex.")
+                    return@forEachIndexed
+                }
+
+                mediaItems.forEach { item ->
+                    if (item.uri.scheme == "content") {
+                        try {
+                            contentResolver.loadThumbnail(item.uri, Size(256, 256), null)
+                            prewarmedCount++
+                        } catch (e: Exception) {
+                            Log.w(logTag, "Failed to pre-warm thumbnail for ${item.id}", e)
+                        }
                     }
                 }
             }
-            Log.d(logTag, "Pre-warm process complete. Successfully pre-warmed $prewarmedCount of ${mediaItems.size} items.")
+            Log.d(logTag, "Pre-warm process complete. Successfully pre-warmed $prewarmedCount of ${filePaths.size} items.")
         }
     }
 }

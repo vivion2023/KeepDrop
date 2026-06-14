@@ -38,6 +38,7 @@ class ProactiveIndexer @Inject constructor(
     private val logTag ="ProactiveIndexer"
     companion object {
         private const val UNIQUE_WORK_NAME = "GlobalMediaIndex"
+        private const val STARTUP_DELAY_MINUTES = 2L
     }
 
     /**
@@ -58,6 +59,7 @@ class ProactiveIndexer @Inject constructor(
 
         val indexingRequest = OneTimeWorkRequestBuilder<ProactiveIndexingWorker>()
             .setConstraints(constraints)
+            .setInitialDelay(STARTUP_DELAY_MINUTES, TimeUnit.MINUTES)
             .setBackoffCriteria(
                 BackoffPolicy.EXPONENTIAL,
                 10,

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * CleanSweep
  * Copyright (c) 2025 LoopOtto
  *
@@ -17,8 +17,6 @@
 package com.cleansweep.ui.screens.swiper
 
 import android.app.Activity
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.view.KeyEvent
 import android.view.TextureView
@@ -27,22 +25,14 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.animateOffsetAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculatePan
-import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -69,12 +59,10 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
@@ -112,8 +100,6 @@ import com.cleansweep.ui.components.AppMenuDivider
 import com.cleansweep.ui.components.FolderSearchDialog
 import com.cleansweep.ui.components.RenameFolderDialog
 import com.cleansweep.ui.theme.AppTheme
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.io.File
@@ -121,13 +107,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material3.ButtonDefaults
-import java.text.DecimalFormat
-import kotlin.math.abs
-import kotlin.math.log10
-import kotlin.math.min
-import kotlin.math.pow
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -370,7 +350,6 @@ fun SwiperScreen(
                                 onSwipeRight = viewModel::handleSwipeRight,
                                 onSwipeDown = viewModel::handleSwipeDown,
                                 onSwipeToDeletePool = viewModel::handleDelete,
-                                onLongPress = viewModel::showMediaItemMenu,
                                 sensitivity = swipeSensitivity,
                                 swipeDownAction = swipeDownAction,
                                 videoPlaybackSpeed = uiState.videoPlaybackSpeed,
@@ -411,6 +390,7 @@ fun SwiperScreen(
                                     onDelete = viewModel::handleDelete,
                                     onShowSummary = viewModel::showSummarySheet,
                                     onUndo = viewModel::revertLastChange,
+                                    onShare = viewModel::shareCurrentItem,
                                     layout = FolderBarLayout.VERTICAL,
                                     folderName = if (folderNameLayout == FolderNameLayout.BELOW) uiState.currentItem!!.bucketName else null
                                 )
@@ -432,7 +412,6 @@ fun SwiperScreen(
                                 onSwipeRight = viewModel::handleSwipeRight,
                                 onSwipeDown = viewModel::handleSwipeDown,
                                 onSwipeToDeletePool = viewModel::handleDelete,
-                                onLongPress = viewModel::showMediaItemMenu,
                                 sensitivity = swipeSensitivity,
                                 swipeDownAction = swipeDownAction,
                                 videoPlaybackSpeed = uiState.videoPlaybackSpeed,
@@ -470,6 +449,7 @@ fun SwiperScreen(
                                 onDelete = viewModel::handleDelete,
                                 onShowSummary = viewModel::showSummarySheet,
                                 onUndo = viewModel::revertLastChange,
+                                onShare = viewModel::shareCurrentItem,
                                 layout = folderBarLayout,
                                 folderName = if (folderNameLayout == FolderNameLayout.BELOW) uiState.currentItem!!.bucketName else null
                             )
@@ -555,18 +535,6 @@ fun SwiperScreen(
                 onToggleFavorite = viewModel::toggleTargetFavorite,
                 onRemove = viewModel::removeTargetFolder
             )
-            MediaItemContextMenu(
-                isVisible = uiState.showMediaItemMenu,
-                menuOffset = uiState.mediaItemMenuOffset,
-                currentItem = uiState.currentItem,
-                isPendingConversion = uiState.isCurrentItemPendingConversion,
-                exoPlayer = exoPlayer,
-                onDismiss = viewModel::dismissMediaItemMenu,
-                onScreenshot = viewModel::addScreenshotChange,
-                onMoveToEdit = viewModel::moveToEditFolder,
-                onShare = viewModel::shareCurrentItem,
-                onOpen = viewModel::openCurrentItem
-            )
         }
         if (uiState.showSummarySheet) {
             val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = skipPartialExpansion)
@@ -647,7 +615,6 @@ private fun MainContent(
     onSwipeRight: () -> Boolean,
     onSwipeDown: () -> Unit,
     onSwipeToDeletePool: () -> Unit,
-    onLongPress: (offset: DpOffset) -> Unit,
     sensitivity: SwipeSensitivity,
     swipeDownAction: SwipeDownAction,
     videoPlaybackSpeed: Float,
@@ -678,7 +645,6 @@ private fun MainContent(
                 onSwipeRight = onSwipeRight,
                 onSwipeDown = onSwipeDown,
                 onSwipeToDeletePool = onSwipeToDeletePool,
-                onLongPress = onLongPress,
                 modifier = Modifier.weight(1f),
                 sensitivity = sensitivity,
                 swipeDownAction = swipeDownAction,
@@ -756,94 +722,6 @@ private fun FolderContextMenu(
     }
 }
 
-private fun formatFileSize(size: Long): String {
-    if (size <= 0) return "0 B"
-    val units = arrayOf("B", "KB", "MB", "GB", "TB")
-    val digitGroups = (log10(size.toDouble()) / log10(1024.0)).toInt()
-    val formatter = DecimalFormat("#,##0.#")
-    return formatter.format(size / 1024.0.pow(digitGroups.toDouble())) + " " + units[digitGroups]
-}
-
-@Composable
-private fun MediaItemContextMenu(
-    isVisible: Boolean,
-    menuOffset: DpOffset,
-    currentItem: MediaItem?,
-    isPendingConversion: Boolean,
-    exoPlayer: ExoPlayer,
-    onDismiss: () -> Unit,
-    onScreenshot: (Long) -> Unit,
-    onMoveToEdit: () -> Unit,
-    onShare: () -> Unit,
-    onOpen: () -> Unit
-) {
-    val appContext = LocalContext.current
-    val copiedString = stringResource(R.string.filename_copied)
-
-    if (isVisible && currentItem != null) {
-        AppDropdownMenu(
-            expanded = true,
-            onDismissRequest = onDismiss,
-            offset = menuOffset
-        ) {
-            DropdownMenuItem(
-                text = {
-                    Column {
-                        Text(
-                            currentItem.displayName,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            stringResource(R.string.file_size_label, formatFileSize(currentItem.size)),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                onClick = {
-                    val clipboard = appContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    val clip = ClipData.newPlainText("Filename", currentItem.displayName)
-                    clipboard.setPrimaryClip(clip)
-                    Toast.makeText(appContext, copiedString, Toast.LENGTH_SHORT).show()
-                    onDismiss()
-                }
-            )
-            AppMenuDivider()
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.move_to_to_edit)) },
-                leadingIcon = { Icon(Icons.Default.Edit, null) },
-                onClick = onMoveToEdit
-            )
-            if (currentItem.isVideo) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.screenshot)) },
-                    leadingIcon = { Icon(Icons.Default.Image, null) },
-                    onClick = {
-                        val timestampMicros = exoPlayer.currentPosition * 1000
-                        onScreenshot(timestampMicros)
-                    },
-                    enabled = !isPendingConversion
-                )
-            }
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.share)) },
-                onClick = onShare,
-                leadingIcon = { Icon(Icons.Default.Share, null) }
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.open_with)) },
-                onClick = onOpen,
-                leadingIcon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, null) }
-            )
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ControlBar(
@@ -855,7 +733,8 @@ private fun ControlBar(
     onKeep: () -> Unit,
     onDelete: () -> Unit,
     onShowSummary: () -> Unit,
-    onUndo: () -> Unit
+    onUndo: () -> Unit,
+    onShare: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -881,6 +760,19 @@ private fun ControlBar(
         Row(
             verticalAlignment = Alignment.CenterVertically
         ) {
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+                    positioning = TooltipAnchorPosition.Above,
+                    spacingBetweenTooltipAndAnchor = 4.dp
+                ),
+                tooltip = { PlainTooltip { Text(stringResource(R.string.share)) } },
+                state = rememberTooltipState()
+            ) {
+                IconButton(onClick = onShare) {
+                    Icon(Icons.Default.Share, stringResource(R.string.share))
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
             TooltipBox(
                 positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
                     positioning = TooltipAnchorPosition.Above,
@@ -998,6 +890,7 @@ private fun BottomFolderBar(
     onDelete: () -> Unit,
     onShowSummary: () -> Unit,
     onUndo: () -> Unit,
+    onShare: () -> Unit,
     layout: FolderBarLayout,
     folderName: String?
 ) {
@@ -1055,7 +948,8 @@ private fun BottomFolderBar(
                     onKeep = onKeep,
                     onDelete = onDelete,
                     onShowSummary = onShowSummary,
-                    onUndo = onUndo
+                    onUndo = onUndo,
+                    onShare = onShare
                 )
 
                 if (targetFolders.isNotEmpty()) {
@@ -1305,7 +1199,6 @@ private fun MediaItemCard(
     onSwipeRight: () -> Boolean,
     onSwipeDown: () -> Unit,
     onSwipeToDeletePool: () -> Unit,
-    onLongPress: (offset: DpOffset) -> Unit,
     onTap: (MediaItem) -> Unit,
     modifier: Modifier = Modifier,
     sensitivity: SwipeSensitivity,
@@ -1318,502 +1211,56 @@ private fun MediaItemCard(
     screenshotDeletesVideo: Boolean,
     fullScreenSwipe: Boolean
 ) {
-    var swipeOffsetX by remember { mutableFloatStateOf(0f) }
-    var swipeOffsetY by remember { mutableFloatStateOf(0f) }
-    var isDragging by remember { mutableStateOf(false) }
-    var dragDirection by remember { mutableIntStateOf(0) } // -1=left, 0=none, 1=right
-    val density = LocalDensity.current
-    var scale by remember { mutableFloatStateOf(1f) }
-    var panOffset by remember { mutableStateOf(Offset.Zero) }
-    val transitionProgressAnim = remember { Animatable(0f) }
-    val animScope = rememberCoroutineScope()
-    var transitionDirection by remember { mutableIntStateOf(0) } // -1=next, 1=previous
-
-    val swipeThreshold = when (sensitivity) {
-        SwipeSensitivity.LOW -> with(density) { 60.dp.toPx() }
-        SwipeSensitivity.MEDIUM -> with(density) { 80.dp.toPx() }
-        SwipeSensitivity.HIGH -> with(density) { 140.dp.toPx() }
-    }
-    // Make swipe down slightly easier to trigger than horizontal swipes
-    val swipeDownThreshold = swipeThreshold * 0.8f
-    val transitionDistance = swipeThreshold * 2.2f
-
-    val animatedOffsetY by animateFloatAsState(
-        targetValue = swipeOffsetY,
-        label = "offsetY",
-        animationSpec = spring(dampingRatio = 0.92f, stiffness = 520f)
-    )
-    val animatedScale by animateFloatAsState(targetValue = scale, label = "scale")
-    val animatedPanOffset by animateOffsetAsState(targetValue = panOffset, label = "panOffset")
-
-    val visibleOffsetY = if (isDragging && animatedScale <= 1f) swipeOffsetY else animatedOffsetY
-
-    val activeDirection = when {
-        isDragging && dragDirection != 0 -> dragDirection
-        transitionDirection != 0 -> transitionDirection
-        else -> 0
-    }
-    val dragProgress = when {
-        dragDirection < 0 -> (-swipeOffsetX / transitionDistance).coerceIn(0f, 1f)
-        dragDirection > 0 -> (swipeOffsetX / transitionDistance).coerceIn(0f, 1f)
-        else -> 0f
-    }
-    val transitionProgress = if (isDragging && dragDirection != 0) {
-        dragProgress
-    } else {
-        transitionProgressAnim.value
-    }
-    val leftSwipeProgress = if (activeDirection < 0) transitionProgress else 0f
-    val rightSwipeProgress = if (activeDirection > 0) transitionProgress else 0f
-    val leftBorderAlpha = leftSwipeProgress
-    val swipeHintColor = MaterialTheme.colorScheme.primary
-    val deletePoolProgress = if (isDragging && swipeOffsetX > 0f && swipeOffsetY < 0f) {
-        min(
-            swipeOffsetX / swipeThreshold,
-            -swipeOffsetY / (swipeThreshold * 0.6f)
-        ).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
-    var globalPosition by remember { mutableStateOf(Offset.Zero) }
-
-    LaunchedEffect(item.id) {
-        scale = 1f
-        panOffset = Offset.Zero
-        swipeOffsetX = 0f
-        swipeOffsetY = 0f
-        isDragging = false
-        dragDirection = 0
-        transitionDirection = 0
-        transitionProgressAnim.snapTo(0f)
-    }
-
-    BoxWithConstraints(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(8.dp)
-    ) {
-        val containerWidth = this.maxWidth
-        val maxCardWidth = containerWidth * 0.98f
-        val maxCardHeight = this.maxHeight * 0.9f
-        fun cardSizeFor(mediaItem: MediaItem): Pair<Dp, Dp> {
-            val aspectRatio = if (mediaItem.width > 0 && mediaItem.height > 0) {
-                mediaItem.width.toFloat() / mediaItem.height.toFloat()
-            } else {
-                1f
-            }
-            val widthByHeight = maxCardHeight * aspectRatio
-            val heightByWidth = maxCardWidth / aspectRatio
-            return if (widthByHeight <= maxCardWidth) {
-                widthByHeight to maxCardHeight
-            } else {
-                maxCardWidth to heightByWidth
-            }
-        }
-        val (cardWidth, cardHeight) = cardSizeFor(item)
-        val nextPreviewItem = previewItems.firstOrNull()
-        val nextCardSize = nextPreviewItem?.let { cardSizeFor(it) }
-        val previousCardSize = previousItem?.let { cardSizeFor(it) }
-        fun edgeDistancePx(cardWidthForLayer: Dp): Float {
-            return with(density) {
-                (containerWidth.toPx() + cardWidthForLayer.toPx()) / 2f + 32.dp.toPx()
-            }
-        }
-        val currentExitDistancePx = edgeDistancePx(cardWidth)
-        val previousEntryLeftPx = previousCardSize?.let { (previousCardWidth, _) -> -edgeDistancePx(previousCardWidth) }
-
-        val gestureModifier = Modifier.pointerInput(item.id, nextPreviewItem?.id, previousItem?.id, swipeDownAction) {
-            forEachGesture {
-                coroutineScope {
-                    awaitPointerEventScope {
-                        var wasDragging = false
-                        var wasTransforming = false
-                        var longPressFired = false
-
-                        val down = awaitFirstDown(requireUnconsumed = true)
-                        val longPressJob = launch {
-                            delay(viewConfiguration.longPressTimeoutMillis)
-                            longPressFired = true
-                            if (scale > 1f) {
-                                scale = 1f
-                                panOffset = Offset.Zero
-                            } else {
-                                val dpOffset = with(density) {
-                                    DpOffset(globalPosition.x.toDp() + down.position.x.toDp(), globalPosition.y.toDp() + down.position.y.toDp())
-                                }
-                                onLongPress(dpOffset)
-                            }
-                        }
-
-                        do {
-                            val event = awaitPointerEvent()
-                            val anyPressed = event.changes.any { it.pressed }
-
-                            if (event.changes.size > 1) {
-                                longPressJob.cancel()
-                                wasTransforming = true
-                                val zoom = event.calculateZoom()
-                                val pan = event.calculatePan()
-                                val newScale = scale * zoom
-
-                                if (newScale < 1f) {
-                                    scale = 1f
-                                    panOffset = Offset.Zero
-                                } else {
-                                    scale = newScale.coerceIn(1f, 5f)
-                                    if (scale > 1f) {
-                                        val xMax = (cardWidth.toPx() * (scale - 1)) / 2
-                                        val yMax = (cardHeight.toPx() * (scale - 1)) / 2
-                                        panOffset = Offset(
-                                            x = (panOffset.x + pan.x * scale).coerceIn(-xMax, xMax),
-                                            y = (panOffset.y + pan.y * scale).coerceIn(-yMax, yMax)
-                                        )
-                                    }
-                                }
-                                event.changes.forEach { it.consume() }
-                            } else if (!wasTransforming) {
-                                val change = event.changes.first()
-                                val dragAmount = change.positionChange()
-
-                                if (dragAmount.getDistance() > viewConfiguration.touchSlop) {
-                                    longPressJob.cancel()
-                                    wasDragging = true
-                                    isDragging = true
-                                    if (scale <= 1f) {
-                                        swipeOffsetX += dragAmount.x
-                                        val nextOffsetY = swipeOffsetY + dragAmount.y
-                                        swipeOffsetY = if (nextOffsetY > 0f && swipeDownAction == SwipeDownAction.NONE) {
-                                            0f
-                                        } else {
-                                            nextOffsetY
-                                        }
-                                        // Lock direction on first significant horizontal move
-                                        if (dragDirection == 0 && abs(swipeOffsetX) > viewConfiguration.touchSlop && abs(swipeOffsetX) > abs(swipeOffsetY)) {
-                                            dragDirection = if (swipeOffsetX < 0) -1 else 1
-                                        }
-                                    }
-                                    change.consume()
-                                }
-                            }
-                        } while (anyPressed)
-
-                        longPressJob.cancel()
-                        isDragging = false
-
-                        if (wasDragging) {
-                            val isDeletePoolSwipe = swipeOffsetX > swipeThreshold && -swipeOffsetY > (swipeThreshold * 0.6f)
-                            when {
-                                isDeletePoolSwipe -> {
-                                    onSwipeToDeletePool()
-                                    swipeOffsetY = 0f
-                                    animScope.launch { transitionProgressAnim.snapTo(0f) }
-                                }
-                                swipeOffsetX < -swipeThreshold -> {
-                                    val releaseProgress = (-swipeOffsetX / transitionDistance).coerceIn(0f, 1f)
-                                    swipeOffsetY = 0f
-                                    transitionDirection = -1
-                                    animScope.launch {
-                                        transitionProgressAnim.snapTo(releaseProgress)
-                                        if (nextPreviewItem == null) {
-                                            transitionProgressAnim.animateTo(0f, spring(dampingRatio = 0.86f, stiffness = 420f))
-                                            transitionDirection = 0
-                                        } else {
-                                            transitionProgressAnim.animateTo(1f, tween(220, easing = FastOutSlowInEasing))
-                                            val navigated = onSwipeLeft()
-                                            if (!navigated) {
-                                                transitionProgressAnim.animateTo(0f, spring(dampingRatio = 0.86f, stiffness = 420f))
-                                                transitionDirection = 0
-                                            }
-                                        }
-                                    }
-                                }
-                                swipeOffsetX > swipeThreshold -> {
-                                    val releaseProgress = (swipeOffsetX / transitionDistance).coerceIn(0f, 1f)
-                                    swipeOffsetY = 0f
-                                    transitionDirection = 1
-                                    animScope.launch {
-                                        transitionProgressAnim.snapTo(releaseProgress)
-                                        if (previousItem == null) {
-                                            transitionProgressAnim.animateTo(0f, spring(dampingRatio = 0.86f, stiffness = 420f))
-                                            transitionDirection = 0
-                                        } else {
-                                            transitionProgressAnim.animateTo(1f, tween(220, easing = FastOutSlowInEasing))
-                                            val navigated = onSwipeRight()
-                                            if (!navigated) {
-                                                transitionProgressAnim.animateTo(0f, spring(dampingRatio = 0.86f, stiffness = 420f))
-                                                transitionDirection = 0
-                                            }
-                                        }
-                                    }
-                                }
-                                swipeOffsetY > swipeDownThreshold -> {
-                                    onSwipeDown()
-                                    swipeOffsetY = 0f
-                                    animScope.launch { transitionProgressAnim.snapTo(0f) }
-                                }
-                                else -> {
-                                    val releaseDirection = dragDirection
-                                    val releaseProgress = when {
-                                        releaseDirection < 0 -> (-swipeOffsetX / transitionDistance).coerceIn(0f, 1f)
-                                        releaseDirection > 0 -> (swipeOffsetX / transitionDistance).coerceIn(0f, 1f)
-                                        else -> 0f
-                                    }
-                                    swipeOffsetY = 0f
-                                    if (releaseDirection != 0 && releaseProgress > 0f) {
-                                        transitionDirection = releaseDirection
-                                        animScope.launch {
-                                            transitionProgressAnim.snapTo(releaseProgress)
-                                            transitionProgressAnim.animateTo(0f, spring(dampingRatio = 0.86f, stiffness = 420f))
-                                            transitionDirection = 0
-                                        }
-                                    } else {
-                                        animScope.launch { transitionProgressAnim.snapTo(0f) }
-                                    }
-                                }
-                            }
-                            swipeOffsetX = 0f
-                            dragDirection = 0
-                        } else if (!wasTransforming && !longPressFired) {
-                            if (scale > 1f) {
-                                scale = 1f
-                                panOffset = Offset.Zero
-                            } else {
-                                onTap(item)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(if (fullScreenSwipe) gestureModifier else Modifier)
-        ) {
-            // Right-to-left swipe: next image stays centered, then grows into the active card.
-            if (activeDirection < 0 && nextPreviewItem != null && nextCardSize != null && leftSwipeProgress > 0.001f) {
-                val (nextCardWidth, nextCardHeight) = nextCardSize
-                val revealProgress = leftSwipeProgress
-                val nextScale = 0.92f + (0.08f * revealProgress)
-                val nextAlpha = 0.35f + (0.65f * revealProgress)
-
+    SwipeCardStack(
+        item = item,
+        previousItem = previousItem,
+        nextItem = previewItems.firstOrNull(),
+        exoPlayer = exoPlayer,
+        imageLoader = imageLoader,
+        gifImageLoader = gifImageLoader,
+        onSwipeLeft = onSwipeLeft,
+        onSwipeRight = onSwipeRight,
+        onSwipeDown = onSwipeDown,
+        onSwipeToDeletePool = onSwipeToDeletePool,
+        onTap = onTap,
+        modifier = modifier,
+        sensitivity = sensitivity,
+        swipeDownAction = swipeDownAction,
+        videoPlaybackSpeed = videoPlaybackSpeed,
+        onSetVideoPlaybackSpeed = onSetVideoPlaybackSpeed,
+        isVideoMuted = isVideoMuted,
+        onToggleMute = onToggleMute,
+        isPendingConversion = isPendingConversion,
+        screenshotDeletesVideo = screenshotDeletesVideo,
+        fullScreenSwipe = fullScreenSwipe,
+        pageContent = { mediaItem, isCurrent, isPreview, pageModifier ->
+            Card(
+                modifier = pageModifier,
+                shape = MaterialTheme.shapes.medium,
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
                 Box(
                     modifier = Modifier
-                        .width(nextCardWidth)
-                        .height(nextCardHeight)
-                        .align(Alignment.Center)
-                        .graphicsLayer {
-                            scaleX = nextScale
-                            scaleY = nextScale
-                            alpha = nextAlpha.coerceIn(0f, 1f)
-                        }
-                ) {
-                    Card(
-                        modifier = Modifier.fillMaxSize(),
-                        shape = MaterialTheme.shapes.medium,
-                        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f * revealProgress)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                    ) {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            MediaCardArtwork(
-                                item = nextPreviewItem,
-                                exoPlayer = exoPlayer,
-                                imageLoader = imageLoader,
-                                gifImageLoader = gifImageLoader,
-                                modifier = Modifier.fillMaxSize(),
-                                isPreview = true
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Current card (front)
-            Box(
-                modifier = Modifier
-                    .width(cardWidth)
-                    .height(cardHeight)
-                    .align(Alignment.Center)
-                    .onGloballyPositioned {
-                        globalPosition = it.localToWindow(Offset.Zero)
-                    }
-                    .then(if (!fullScreenSwipe) gestureModifier else Modifier)
-                    .graphicsLayer {
-                        val transitionScale = when {
-                            deletePoolProgress > 0f -> 1f - (0.16f * deletePoolProgress)
-                            activeDirection > 0 -> 1f - (0.25f * transitionProgress)
-                            else -> 1f
-                        }
-                        translationX = if (animatedScale > 1f) animatedPanOffset.x
-                            else if (deletePoolProgress > 0f) swipeOffsetX * (0.35f + 0.2f * deletePoolProgress)
-                            else if (activeDirection < 0) -currentExitDistancePx * transitionProgress
-                            else 0f
-                        translationY = if (animatedScale > 1f) animatedPanOffset.y
-                            else if (deletePoolProgress > 0f) visibleOffsetY * (0.55f + 0.25f * deletePoolProgress)
-                            else visibleOffsetY
-                        scaleX = animatedScale * transitionScale
-                        scaleY = animatedScale * transitionScale
-                        alpha = when {
-                            deletePoolProgress > 0f -> (1f - 0.25f * deletePoolProgress).coerceAtLeast(0.75f)
-                            activeDirection > 0 -> (1f - transitionProgress).coerceAtLeast(0f)
-                            else -> 1f
-                        }
-                        rotationZ = if (deletePoolProgress > 0f) 8f * deletePoolProgress else 0f
-                        clip = false
-                    },
-            ) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .align(Alignment.Center),
-                    shape = MaterialTheme.shapes.medium,
-                    colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                ) {
-                    Box(modifier = Modifier
                         .fillMaxSize()
                         .background(Color.Transparent)
-                        .clip(MaterialTheme.shapes.medium)) {
-                        MediaCardArtwork(
-                            item = item,
-                            exoPlayer = exoPlayer,
-                            imageLoader = imageLoader,
-                            gifImageLoader = gifImageLoader,
-                            modifier = Modifier.fillMaxSize(),
-                            isPreview = false
-                        )
-                        if (leftBorderAlpha > 0f) {
-                            Canvas(modifier = Modifier.fillMaxSize()) {
-                                val intensity = (leftBorderAlpha * 0.7f).coerceAtMost(0.7f)
-                                drawRect(brush = Brush.radialGradient(0.0f to swipeHintColor.copy(alpha = intensity), 0.15f to swipeHintColor.copy(alpha = intensity * 0.2f), 1.0f to Color.Transparent, center = Offset(0f, size.height), radius = size.maxDimension * (1.0f + leftBorderAlpha)))
-                            }
-                        }
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            if (leftBorderAlpha > 0f) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
-                                    contentDescription = stringResource(R.string.next_image),
-                                    tint = Color.White.copy(alpha = 0.9f),
-                                    modifier = Modifier
-                                        .align(Alignment.CenterStart)
-                                        .padding(start = 20.dp)
-                                        .graphicsLayer(alpha = leftBorderAlpha)
-                                )
-                            }
-                            if (item.isVideo) {
-                                val muteDesc = if (isVideoMuted) stringResource(R.string.unmute_video) else stringResource(R.string.mute_video)
-                                TooltipBox(
-                                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
-                                        positioning = TooltipAnchorPosition.Above,
-                                        spacingBetweenTooltipAndAnchor = 4.dp
-                                    ),
-                                    tooltip = { PlainTooltip { Text(muteDesc) } },
-                                    state = rememberTooltipState()
-                                ) {
-                                    IconButton(
-                                        onClick = onToggleMute,
-                                        modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .padding(8.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isVideoMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                                            contentDescription = muteDesc,
-                                            tint = Color.White
-                                        )
-                                    }
-                                }
-                                if (isPendingConversion && !screenshotDeletesVideo) {
-                                    Box(
-                                        modifier = Modifier
-                                            .align(Alignment.TopStart)
-                                            .padding(8.dp)
-                                            .clip(CircleShape)
-                                            .background(Color.Black.copy(alpha = 0.5f))
-                                            .padding(8.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Photo,
-                                            contentDescription = stringResource(R.string.pending_conversion_desc),
-                                            tint = Color.White,
-                                            modifier = Modifier.size(24.dp)
-                                        )
-                                    }
-                                }
-                            }
-
-                            if (item.isVideo) {
-                                TextButton(
-                                    onClick = {
-                                        val nextSpeed = when (videoPlaybackSpeed) {
-                                            1.0f -> 1.5f
-                                            1.5f -> 2.0f
-                                            else -> 1.0f
-                                        }
-                                        onSetVideoPlaybackSpeed(nextSpeed)
-                                    },
-                                    colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
-                                    contentPadding = PaddingValues(4.dp),
-                                    modifier = Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .padding(end = 8.dp)
-                                ) {
-                                    Text(
-                                        "${videoPlaybackSpeed}x",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
-                        }
-                    }
-                }
-            }
-
-            // Left-to-right swipe: previous image enters from the left edge into the center.
-            if (activeDirection > 0 && previousItem != null && previousCardSize != null && previousEntryLeftPx != null && rightSwipeProgress > 0.001f) {
-                val (prevCardWidth, prevCardHeight) = previousCardSize
-                val revealProgress = rightSwipeProgress
-                val prevAlpha = 0.35f + (0.65f * revealProgress)
-
-                Box(
-                    modifier = Modifier
-                        .width(prevCardWidth)
-                        .height(prevCardHeight)
-                        .align(Alignment.Center)
-                        .graphicsLayer {
-                            translationX = previousEntryLeftPx * (1f - revealProgress)
-                            alpha = prevAlpha.coerceIn(0f, 1f)
-                        }
+                        .clip(MaterialTheme.shapes.medium)
                 ) {
-                    Card(
+                    MediaCardArtwork(
+                        item = mediaItem,
+                        exoPlayer = exoPlayer,
+                        imageLoader = imageLoader,
+                        gifImageLoader = gifImageLoader,
                         modifier = Modifier.fillMaxSize(),
-                        shape = MaterialTheme.shapes.medium,
-                        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f * revealProgress)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                    ) {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            MediaCardArtwork(
-                                item = previousItem,
-                                exoPlayer = exoPlayer,
-                                imageLoader = imageLoader,
-                                gifImageLoader = gifImageLoader,
-                                modifier = Modifier.fillMaxSize(),
-                                isPreview = true
-                            )
-                        }
-                    }
+                        isPreview = isPreview
+                    )
                 }
             }
-
         }
-    }
+    )
 }
+
 
 @Composable
 private fun MediaCardArtwork(

@@ -25,9 +25,15 @@ import dagger.hilt.android.AndroidEntryPoint
 abstract class BaseActivity : AppCompatActivity() {
 
     protected val mainViewModel: MainViewModel by viewModels()
+    private var hasResumedOnce = false
 
     override fun onResume() {
         super.onResume()
+        if (!hasResumedOnce) {
+            hasResumedOnce = true
+            return
+        }
+
         // Invalidate the folder cache whenever the user returns to the app.
         // This ensures the folder lists are refreshed to reflect external changes.
         mainViewModel.onAppResumed()

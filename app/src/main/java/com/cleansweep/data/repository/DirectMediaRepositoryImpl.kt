@@ -26,9 +26,6 @@ import android.provider.MediaStore
 import android.util.Log
 import android.webkit.MimeTypeMap
 import androidx.core.net.toUri
-import coil.ImageLoader
-import coil.request.ImageRequest
-import coil.size.Size
 import com.cleansweep.R
 import com.cleansweep.data.db.dao.FolderDetailsDao
 import com.cleansweep.data.db.entity.FolderDetailsCache
@@ -42,6 +39,7 @@ import com.cleansweep.domain.model.IndexingStatus
 import com.cleansweep.domain.repository.MediaRepository
 import com.cleansweep.util.FileManager
 import com.cleansweep.util.FileOperationsHelper
+import com.cleansweep.util.ImageDimensions
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -62,7 +60,6 @@ import kotlin.coroutines.resume
 @Singleton
 class DirectMediaRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val imageLoader: ImageLoader,
     private val folderDetailsDao: FolderDetailsDao,
     private val preferencesRepository: PreferencesRepository,
     @AppModule.ApplicationScope private val externalScope: CoroutineScope,
@@ -187,7 +184,7 @@ class DirectMediaRepositoryImpl @Inject constructor(
                 _isPerformingBackgroundRefresh.value = true
 
                 // --- SCAN ---
-                val mediaFolderDetails = performSinglePassFileSystemScan()
+                val mediaFolderDetails = performMediaStoreFolderScan()
                 val targetFolders = findViableTargetFolders()
                 val newMediaFolderCacheEntries = mediaFolderDetails.map { it.toFolderDetailsCache() }
                 val newTargetFolderCacheEntries = targetFolders.map { (path, name) ->
@@ -257,50 +254,51 @@ class DirectMediaRepositoryImpl @Inject constructor(
         val mediaStoreDataMap = getMediaStoreDataForBuckets(bucketIds)
         Log.d(logTag, "Pre-fetched ${mediaStoreDataMap.size} items from MediaStore.")
 
-        // Step 2: Get a lightweight list of all File objects from the file system, NON-RECURSIVELY.
-        val fileSystemFiles = withContext(Dispatchers.IO) {
-            bucketIds.flatMap { bucketPath ->
-                try {
-                    File(bucketPath)
-                        .listFiles { file -> file.isFile && isMediaFile(file) }
-                        ?.toList() ?: emptyList()
-                } catch (e: Exception) {
-                    Log.e(logTag, "Error reading files from bucket: $bucketPath", e)
-                    emptyList<File>()
-                }
-            }.toSet()
-        }
-        Log.d(logTag, "Direct non-recursive file scan found ${fileSystemFiles.size} total files.")
-
-
-        // Step 3: Combine and sort the list of File objects to establish the processing order.
-        val sortedFileIndex = withContext(Dispatchers.Default) {
-            val allFilePaths = fileSystemFiles.map { it.absolutePath } + mediaStoreDataMap.keys
-            allFilePaths.distinct()
-                .mapNotNull { path -> try { File(path) } catch (e: Exception) { null } }
-                .filter { it.exists() }
-                .sortedByDescending { it.lastModified() }
-        }
-        Log.d(logTag, "Discovered and sorted ${sortedFileIndex.size} unique files.")
-
-        // Step 4: Process the sorted list, stream results, and track un-indexed files.
+        // Step 2: Stream indexed MediaStore items first so the UI can render immediately.
         val initialBatchSize = 5
         val subsequentBatchSize = 20
         val batch = mutableListOf<MediaItem>()
         val unindexedPathsToScan = mutableListOf<String>()
         var isFirstBatch = true
 
-        for (file in sortedFileIndex) {
+        val indexedEntries = mediaStoreDataMap.entries
+            .sortedByDescending { it.value.dateModified }
+
+        for ((path, cache) in indexedEntries) {
             currentCoroutineContext().ensureActive()
+            val file = File(path)
+            if (!file.exists()) continue
 
-            val mediaItem = mediaStoreDataMap[file.absolutePath]?.let { cache ->
-                createMediaItemFromMediaStore(file, cache)
-            } ?: run {
-                unindexedPathsToScan.add(file.absolutePath) // This file was missed by MediaStore, queue it for indexing.
-                createMediaItemFromFile(file)
+            batch.add(createMediaItemFromMediaStore(file, cache))
+
+            val currentBatchSize = if (isFirstBatch) initialBatchSize else subsequentBatchSize
+            if (batch.size >= currentBatchSize) {
+                emit(batch.toList())
+                batch.clear()
+                if (isFirstBatch) isFirstBatch = false
             }
+        }
 
-            mediaItem?.let { batch.add(it) }
+        // Step 3: Scan the file system only for files missing from MediaStore.
+        val unindexedFiles = withContext(Dispatchers.IO) {
+            bucketIds.flatMap { bucketPath ->
+                try {
+                    File(bucketPath)
+                        .listFiles { file -> file.isFile && isMediaFile(file) }
+                        ?.filter { it.absolutePath !in mediaStoreDataMap }
+                        ?.toList() ?: emptyList()
+                } catch (e: Exception) {
+                    Log.e(logTag, "Error reading files from bucket: $bucketPath", e)
+                    emptyList<File>()
+                }
+            }.sortedByDescending { it.lastModified() }
+        }
+        Log.d(logTag, "Found ${indexedEntries.size} indexed and ${unindexedFiles.size} un-indexed files.")
+
+        for (file in unindexedFiles) {
+            currentCoroutineContext().ensureActive()
+            unindexedPathsToScan.add(file.absolutePath)
+            createMediaItemFromFile(file)?.let { batch.add(it) }
 
             val currentBatchSize = if (isFirstBatch) initialBatchSize else subsequentBatchSize
             if (batch.size >= currentBatchSize) {
@@ -469,13 +467,11 @@ class DirectMediaRepositoryImpl @Inject constructor(
                 } catch (e: Exception) {
                     Log.e(dimensionlogTag, "Failed to get dimensions for video: ${file.path}", e)
                 }
-            } else { // Is image
+            } else {
                 try {
-                    val request = ImageRequest.Builder(context).data(file).size(Size.ORIGINAL).build()
-                    imageLoader.execute(request).drawable?.let {
-                        width = it.intrinsicWidth
-                        height = it.intrinsicHeight
-                    }
+                    val (imageWidth, imageHeight) = ImageDimensions.readFromFile(file)
+                    width = imageWidth
+                    height = imageHeight
                 } catch (e: Exception) {
                     Log.e(dimensionlogTag, "Failed to get dimensions for image: ${file.path}", e)
                 }
@@ -807,7 +803,7 @@ class DirectMediaRepositoryImpl @Inject constructor(
      * This now uses the atomic replaceAll to prevent flicker.
      */
     private suspend fun scanAndCacheMediaFolders(): List<FolderDetails> = withContext(Dispatchers.IO) {
-        val finalDetailsList = performSinglePassFileSystemScan()
+        val finalDetailsList = performMediaStoreFolderScan()
         Log.d("CacheDebug", "Scan Stage 1 (Media) complete. Found ${finalDetailsList.size} folders.")
 
         folderDetailsCache = finalDetailsList
@@ -882,8 +878,87 @@ class DirectMediaRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Performs a highly efficient, single-pass scan of the file system to discover all media
-     * folders and calculate their details simultaneously.
+     * Aggregates folder details from MediaStore in a single query. This is significantly faster
+     * than walking the entire file system on first launch.
+     */
+    private suspend fun performMediaStoreFolderScan(): List<FolderDetails> = withContext(Dispatchers.IO) {
+        val processedPaths = preferencesRepository.processedMediaPathsFlow.first()
+        val permanentlySortedFolders = preferencesRepository.permanentlySortedFoldersFlow.first()
+        val standardSystemDirectoryPaths = getStandardSystemDirectoryPaths()
+        val primarySystemPaths = getPrimarySystemDirectoryPaths()
+
+        data class FolderAggregate(
+            val path: String,
+            val name: String,
+            var itemCount: Int = 0,
+            var totalSize: Long = 0L
+        )
+
+        val folderAggregates = mutableMapOf<String, FolderAggregate>()
+        val projection = arrayOf(
+            MediaStore.Files.FileColumns.DATA,
+            MediaStore.Files.FileColumns.SIZE,
+            MediaStore.Files.FileColumns.BUCKET_DISPLAY_NAME
+        )
+        val selection = "${MediaStore.Files.FileColumns.MEDIA_TYPE} IN (?, ?)"
+        val selectionArgs = arrayOf(
+            MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE.toString(),
+            MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString()
+        )
+        val queryUri = MediaStore.Files.getContentUri("external")
+
+        try {
+            context.contentResolver.query(queryUri, projection, selection, selectionArgs, null)?.use { cursor ->
+                val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA)
+                val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.SIZE)
+                val bucketNameColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.BUCKET_DISPLAY_NAME)
+
+                while (cursor.moveToNext()) {
+                    val path = cursor.getString(dataColumn) ?: continue
+                    if (path in processedPaths) continue
+
+                    val parentPath = File(path).parent ?: continue
+                    if (parentPath in permanentlySortedFolders) continue
+
+                    val aggregate = folderAggregates.getOrPut(parentPath) {
+                        FolderAggregate(
+                            path = parentPath,
+                            name = cursor.getString(bucketNameColumn) ?: File(parentPath).name
+                        )
+                    }
+                    aggregate.itemCount++
+                    aggregate.totalSize += cursor.getLong(sizeColumn).coerceAtLeast(0L)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(logTag, "MediaStore folder scan failed, falling back to file system scan.", e)
+            return@withContext performSinglePassFileSystemScan()
+        }
+
+        return@withContext folderAggregates.values
+            .asSequence()
+            .filter { it.itemCount > 0 }
+            .map { aggregate ->
+                val folderFile = File(aggregate.path)
+                val isSystem = aggregate.path in standardSystemDirectoryPaths ||
+                    isConventionalSystemChildFolder(folderFile, standardSystemDirectoryPaths)
+                val isPrimarySystem = aggregate.path in primarySystemPaths
+
+                FolderDetails(
+                    path = aggregate.path,
+                    name = aggregate.name,
+                    itemCount = aggregate.itemCount,
+                    totalSize = aggregate.totalSize,
+                    isSystemFolder = isSystem,
+                    isPrimarySystemFolder = isPrimarySystem
+                )
+            }
+            .toList()
+    }
+
+    /**
+     * Fallback scan that walks the file system to discover media folders. Used only when
+     * MediaStore is unavailable or returns incomplete data.
      */
     private suspend fun performSinglePassFileSystemScan(): List<FolderDetails> = withContext(Dispatchers.IO) {
         val processedPaths = preferencesRepository.processedMediaPathsFlow.first()
