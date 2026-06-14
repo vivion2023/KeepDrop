@@ -136,6 +136,8 @@ fun SwiperScreen(
     val folderSearchState by viewModel.folderSearchManager.state.collectAsState()
     val focusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
+    var deletePoolSwipeProgress by remember { mutableFloatStateOf(0f) }
+    var showUsageDialog by remember { mutableStateOf(false) }
 
     BackHandler {
         if (uiState.isSortingComplete && uiState.pendingChanges.isEmpty()) {
@@ -246,75 +248,79 @@ fun SwiperScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("") }, // Not sure
-                navigationIcon = {
-                    TooltipBox(
-                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
-                            positioning = TooltipAnchorPosition.Above,
-                            spacingBetweenTooltipAndAnchor = 4.dp
-                        ),
-                        tooltip = { PlainTooltip { Text(stringResource(R.string.navigate_back)) } },
-                        state = rememberTooltipState()
-                    ) {
-                        IconButton(onClick = { viewModel.onNavigateUp() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.navigate_back))
-                        }
-                    }
-                },
-                actions = {
-                    AnimatedVisibility(visible = uiState.toDelete.isNotEmpty()) {
+            if (isExpandedScreen) {
+                TopAppBar(
+                    title = { Text("") },
+                    navigationIcon = {
                         TooltipBox(
                             positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
                                 positioning = TooltipAnchorPosition.Above,
                                 spacingBetweenTooltipAndAnchor = 4.dp
                             ),
-                            tooltip = { PlainTooltip { Text(stringResource(R.string.review_changes)) } },
+                            tooltip = { PlainTooltip { Text(stringResource(R.string.navigate_back)) } },
                             state = rememberTooltipState()
                         ) {
-                            BadgedBox(
-                                badge = {
-                                    Badge {
-                                        Text(uiState.toDelete.size.toString())
-                                    }
-                                }
+                            IconButton(onClick = { viewModel.onNavigateUp() }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.navigate_back))
+                            }
+                        }
+                    },
+                    actions = {
+                        AnimatedVisibility(visible = uiState.toDelete.isNotEmpty()) {
+                            TooltipBox(
+                                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+                                    positioning = TooltipAnchorPosition.Above,
+                                    spacingBetweenTooltipAndAnchor = 4.dp
+                                ),
+                                tooltip = { PlainTooltip { Text(stringResource(R.string.review_changes)) } },
+                                state = rememberTooltipState()
                             ) {
-                                IconButton(onClick = viewModel::showSummarySheet) {
-                                    Icon(Icons.Default.DeleteOutline, contentDescription = stringResource(R.string.review_changes))
+                                BadgedBox(
+                                    badge = {
+                                        Badge {
+                                            Text(uiState.toDelete.size.toString())
+                                        }
+                                    }
+                                ) {
+                                    IconButton(onClick = viewModel::showSummarySheet) {
+                                        Icon(Icons.Default.DeleteOutline, contentDescription = stringResource(R.string.review_changes))
+                                    }
                                 }
                             }
                         }
-                    }
-                    TooltipBox(
-                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
-                            positioning = TooltipAnchorPosition.Above,
-                            spacingBetweenTooltipAndAnchor = 4.dp
-                        ),
-                        tooltip = { PlainTooltip { Text(stringResource(R.string.find_duplicates)) } },
-                        state = rememberTooltipState()
-                    ) {
-                        IconButton(onClick = onNavigateToDuplicates) {
-                            Icon(Icons.Default.ControlPointDuplicate, contentDescription = stringResource(R.string.find_duplicates))
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+                                positioning = TooltipAnchorPosition.Above,
+                                spacingBetweenTooltipAndAnchor = 4.dp
+                            ),
+                            tooltip = { PlainTooltip { Text(stringResource(R.string.find_duplicates)) } },
+                            state = rememberTooltipState()
+                        ) {
+                            IconButton(onClick = onNavigateToDuplicates) {
+                                Icon(Icons.Default.ControlPointDuplicate, contentDescription = stringResource(R.string.find_duplicates))
+                            }
+                        }
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+                                positioning = TooltipAnchorPosition.Above,
+                                spacingBetweenTooltipAndAnchor = 4.dp
+                            ),
+                            tooltip = { PlainTooltip { Text(stringResource(R.string.settings)) } },
+                            state = rememberTooltipState()
+                        ) {
+                            IconButton(onClick = onNavigateToSettings) {
+                                Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings))
+                            }
                         }
                     }
-                    TooltipBox(
-                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
-                            positioning = TooltipAnchorPosition.Above,
-                            spacingBetweenTooltipAndAnchor = 4.dp
-                        ),
-                        tooltip = { PlainTooltip { Text(stringResource(R.string.settings)) } },
-                        state = rememberTooltipState()
-                    ) {
-                        IconButton(onClick = onNavigateToSettings) { Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings)) }
-                    }
-                }
-            )
+                )
+            }
         }
     ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = paddingValues.calculateTopPadding())
+                .padding(top = if (isExpandedScreen) paddingValues.calculateTopPadding() else 0.dp)
                 .focusRequester(focusRequester)
                 .focusable()
                 .onKeyEvent { event ->
@@ -397,61 +403,70 @@ fun SwiperScreen(
                             }
                         }
                     } else {
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            MainContent(
+                        val currentItem = uiState.currentItem!!
+                        Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                            OrganizeTopBar(
+                                albumName = currentItem.bucketName,
+                                deletePoolCount = uiState.toDelete.size,
+                                onClose = viewModel::onNavigateUp,
+                                onDeletePoolClick = viewModel::showSummarySheet,
+                                deletePoolSwipeProgress = deletePoolSwipeProgress
+                            )
+                            OrganizeMediaMetaLine(
+                                currentIndex = uiState.currentIndex + 1,
+                                totalCount = uiState.allMediaItems.size,
+                                dateTimestampMs = currentItem.dateModified
+                            )
+                            Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .zIndex(1f),
-                                currentItem = uiState.currentItem!!,
-                                previousItem = viewModel.getPreviousBrowsableItem(),
-                                upcomingItems = viewModel.getUpcomingBrowsableItems(2),
-                                exoPlayer = exoPlayer,
-                                imageLoader = viewModel.imageLoader,
-                                gifImageLoader = viewModel.gifImageLoader,
-                                onSwipeLeft = viewModel::handleSwipeLeft,
-                                onSwipeRight = viewModel::handleSwipeRight,
-                                onSwipeDown = viewModel::handleSwipeDown,
-                                onSwipeToDeletePool = viewModel::handleDelete,
-                                sensitivity = swipeSensitivity,
-                                swipeDownAction = swipeDownAction,
-                                videoPlaybackSpeed = uiState.videoPlaybackSpeed,
-                                onSetVideoPlaybackSpeed = viewModel::setPlaybackSpeed,
-                                isVideoMuted = uiState.isVideoMuted,
-                                onToggleMute = {
-                                    val hasAudio = exoPlayer.currentTracks.isTypeSupported(C.TRACK_TYPE_AUDIO)
-                                    viewModel.toggleMute(hasAudio)
-                                },
-                                onTap = {
-                                    if (it.isVideo) {
-                                        if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
-                                    }
-                                },
-                                isPendingConversion = uiState.isCurrentItemPendingConversion,
-                                screenshotDeletesVideo = screenshotDeletesVideo,
-                                folderNameLayout = folderNameLayout,
-                                fullScreenSwipe = uiState.fullScreenSwipe
+                                    .zIndex(1f)
+                            ) {
+                                MainContent(
+                                    modifier = Modifier.fillMaxSize(),
+                                    currentItem = currentItem,
+                                    previousItem = viewModel.getPreviousBrowsableItem(),
+                                    upcomingItems = viewModel.getUpcomingBrowsableItems(2),
+                                    exoPlayer = exoPlayer,
+                                    imageLoader = viewModel.imageLoader,
+                                    gifImageLoader = viewModel.gifImageLoader,
+                                    onSwipeLeft = viewModel::handleSwipeLeft,
+                                    onSwipeRight = viewModel::handleSwipeRight,
+                                    onSwipeDown = viewModel::handleSwipeDown,
+                                    onSwipeToDeletePool = viewModel::handleDelete,
+                                    sensitivity = swipeSensitivity,
+                                    swipeDownAction = swipeDownAction,
+                                    videoPlaybackSpeed = uiState.videoPlaybackSpeed,
+                                    onSetVideoPlaybackSpeed = viewModel::setPlaybackSpeed,
+                                    isVideoMuted = uiState.isVideoMuted,
+                                    onToggleMute = {
+                                        val hasAudio = exoPlayer.currentTracks.isTypeSupported(C.TRACK_TYPE_AUDIO)
+                                        viewModel.toggleMute(hasAudio)
+                                    },
+                                    onTap = {
+                                        if (it.isVideo) {
+                                            if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+                                        }
+                                    },
+                                    isPendingConversion = uiState.isCurrentItemPendingConversion,
+                                    screenshotDeletesVideo = screenshotDeletesVideo,
+                                    folderNameLayout = FolderNameLayout.BELOW,
+                                    fullScreenSwipe = uiState.fullScreenSwipe,
+                                    onDeletePoolProgress = { deletePoolSwipeProgress = it }
+                                )
+                            }
+                            OrganizeActionBar(
+                                onNext = viewModel::handleSwipeLeft,
+                                onHelp = { showUsageDialog = true },
+                                onShare = viewModel::shareCurrentItem,
+                                onClear = viewModel::handleDelete
                             )
-                            BottomFolderBar(
+                            OrganizeFolderTransferSection(
                                 targetFolders = uiState.targetFolders,
-                                compactFoldersView = uiState.compactFoldersView,
-                                isFolderBarExpanded = uiState.isFolderBarExpanded,
-                                onSetExpanded = viewModel::setFolderBarExpanded,
-                                currentTheme = uiState.currentTheme,
-                                useLegacyFolderIcons = uiState.useLegacyFolderIcons,
-                                pendingChangesCount = uiState.pendingChanges.size,
-                                currentItem = uiState.currentItem,
+                                currentItem = currentItem,
                                 targetFavorites = uiState.targetFavorites,
                                 onSelectFolder = viewModel::moveToFolder,
-                                onLongPressFolder = viewModel::showFolderMenu,
-                                onCreateNewAlbum = viewModel::showAddTargetFolderDialog,
-                                onToggleExpansion = viewModel::toggleFolderBarExpansion,
-                                onKeep = viewModel::handleKeep,
-                                onDelete = viewModel::handleDelete,
-                                onShowSummary = viewModel::showSummarySheet,
-                                onUndo = viewModel::revertLastChange,
-                                onShare = viewModel::shareCurrentItem,
-                                layout = folderBarLayout,
-                                folderName = if (folderNameLayout == FolderNameLayout.BELOW) uiState.currentItem!!.bucketName else null
+                                onCreateNewAlbum = viewModel::showAddTargetFolderDialog
                             )
                         }
                     }
@@ -535,6 +550,9 @@ fun SwiperScreen(
                 onToggleFavorite = viewModel::toggleTargetFavorite,
                 onRemove = viewModel::removeTargetFolder
             )
+            if (showUsageDialog) {
+                OrganizeUsageDialog(onDismiss = { showUsageDialog = false })
+            }
         }
         if (uiState.showSummarySheet) {
             val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = skipPartialExpansion)
@@ -625,7 +643,8 @@ private fun MainContent(
     isPendingConversion: Boolean,
     screenshotDeletesVideo: Boolean,
     folderNameLayout: FolderNameLayout,
-    fullScreenSwipe: Boolean
+    fullScreenSwipe: Boolean,
+    onDeletePoolProgress: (Float) -> Unit = {}
 ) {
     Column(modifier) {
         if (folderNameLayout == FolderNameLayout.ABOVE) {
@@ -655,7 +674,8 @@ private fun MainContent(
                 onTap = onTap,
                 isPendingConversion = isPendingConversion,
                 screenshotDeletesVideo = screenshotDeletesVideo,
-                fullScreenSwipe = fullScreenSwipe
+                fullScreenSwipe = fullScreenSwipe,
+                onDeletePoolProgress = onDeletePoolProgress
             )
         }
     }
@@ -1209,7 +1229,8 @@ private fun MediaItemCard(
     onToggleMute: () -> Unit,
     isPendingConversion: Boolean,
     screenshotDeletesVideo: Boolean,
-    fullScreenSwipe: Boolean
+    fullScreenSwipe: Boolean,
+    onDeletePoolProgress: (Float) -> Unit = {}
 ) {
     SwipeCardStack(
         item = item,
@@ -1233,6 +1254,7 @@ private fun MediaItemCard(
         isPendingConversion = isPendingConversion,
         screenshotDeletesVideo = screenshotDeletesVideo,
         fullScreenSwipe = fullScreenSwipe,
+        onDeletePoolProgress = onDeletePoolProgress,
         pageContent = { mediaItem, isCurrent, isPreview, pageModifier ->
             Card(
                 modifier = pageModifier,

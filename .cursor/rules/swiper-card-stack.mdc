@@ -1,0 +1,28 @@
+---
+description: Frozen swipe card stack behavior for SwipeCardStack.kt — do not regress horizontal browse animations
+globs: app/src/main/java/com/cleansweep/ui/screens/swiper/SwipeCardStack.kt
+alwaysApply: false
+---
+
+# SwipeCardStack — Do Not Regress
+
+Full spec: `docs/swiper-card-stack.md`
+
+When editing `SwipeCardStack.kt`, preserve the approved horizontal browse interaction:
+
+## Left swipe (next)
+- Current: translates left with finger; exits left on commit.
+- Next: **centered**, scale 0.92→1.0, alpha 0.35→1.0. No translation.
+
+## Right swipe (previous) — mirror / reverse of left
+- Previous: translates from `-exitDistancePx` to center, **alpha always 1.0** when visible, on **top** z-index.
+- Current: **translationX = 0**, scale 1.0→0.92, alpha 1.0→0.35. Stays underneath.
+
+## Forbidden changes
+- Do not set `revealAdjacentCards = false` or clip the stack to hide the card effect.
+- Do not translate current card right during right swipe.
+- Do not fade the incoming previous card in (only current fades on right swipe).
+- Do not show next/previous at idle (`alpha = 0` when `leftReveal` / `rightReveal` is 0).
+- Do not use mismatched progress denominators for drag vs commit (use `exitDistancePx`).
+
+Delete-pool diagonal swipe and video overlays are independent; do not rewrite browse logic when touching those.
