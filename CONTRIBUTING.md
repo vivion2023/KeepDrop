@@ -1,5 +1,11 @@
 # Contributing to CleanSweep
 
+<!-- 
+AI / Grok / Agent NOTE: 
+If the user requires you to use git commit (e.g. "commit this", "make a git commit"), you MUST format ALL commit messages according to the Conventional Commits specification.
+See AGENTS.md (top section) and the "Commit Messages" section below. This annotation exists so the rule is visible every time documentation is read.
+-->
+
 Thank you for your interest in contributing to CleanSweep! We're excited to have your help in making the app better. This document outlines our guidelines to ensure a smooth and effective collaboration process for everyone.
 
 ## How to Contribute
@@ -67,6 +73,30 @@ fun MyComponent(
     Button(enabled = !isLoading, onClick = onButtonClicked) { /* ... */ }
 }
 ```
+
+## Commit Messages
+
+**For AI assistants and humans alike:**
+
+If a user (or the development process) instructs you to produce git commits using the terminal (e.g. `git commit -m "..."` or `git commit`), **you must follow the Conventional Commits specification**.
+
+- Format: `<type>(<scope>): <description>`
+- See the full spec: https://www.conventionalcommits.org/
+- This rule is also documented in `AGENTS.md` (the primary instruction file for AI agents). The note is deliberately repeated in multiple documentation files so that it is encountered on every read.
+
+**Recommended types**
+- `feat`: A new feature
+- `fix`: A bug fix
+- `docs`: Documentation only changes
+- `refactor`: A code change that neither fixes a bug nor adds a feature
+- `test`, `chore`, `perf`, `build`, `ci`, `style`
+
+**Good examples**
+- `feat(swiper): inline next/clear labels with check and x icons`
+- `fix(ui): tighten image margins and reduce surrounding padding`
+- `docs(contributing): document Conventional Commits rule for git usage`
+
+Always keep the subject line under ~72 characters and use present tense.
 
 ## Submitting a Pull Request
 

@@ -1,5 +1,7 @@
 # Swipe Card Stack — Diagonal Drag Spec
 
+<!-- AI / Grok NOTE: If user requires git commits, MUST use Conventional Commits. See AGENTS.md + CONTRIBUTING.md. This marker is added so the requirement appears in every file read. -->
+
 > **Status:** Approved UX as of 2026-06-14 (evolving).  
 > **Implementation:** `app/src/main/java/com/cleansweep/ui/screens/swiper/SwipeCardStack.kt`  
 > **Frozen horizontal browse:** `docs/swiper-card-stack.md` — **do not merge** diagonal logic into left/right reveal math.

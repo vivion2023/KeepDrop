@@ -72,6 +72,12 @@ CleanSweep needs certain permissions to manage your files. Here’s a simple bre
 
 ## For Developers
 
+<!-- 
+AI / Grok / Agent NOTE: 
+If the user requires you to use git commit messages, you MUST submit according to Conventional Commits spec.
+See AGENTS.md and CONTRIBUTING.md. This marker is placed here so the rule appears whenever README is read.
+-->
+
 ### Technologies Used
 CleanSweep is built with a modern Android development approach, leveraging the following key technologies and libraries:
 
@@ -87,7 +93,7 @@ CleanSweep is built with a modern Android development approach, leveraging the f
 ### Contributing
 We welcome contributions of all kinds, from bug reports to feature requests, code improvements and translations!
 
-To ensure a smooth and collaborative process, please read our **[Contributing Guidelines](CONTRIBUTING.md)** before you start. This document outlines our development workflow, coding standards, and how to submit your changes.
+To ensure a smooth and collaborative process, please read our **[Contributing Guidelines](CONTRIBUTING.md)** before you start. This document outlines our development workflow, coding standards, **commit message format (Conventional Commits)**, and how to submit your changes.
 
 **Note:** Translation contributions are highly valued and will be merged promptly after review. Feature requests from project supporters, such as donors and contributors, will also receive priority.
 ## Donating

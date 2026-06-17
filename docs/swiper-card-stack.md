@@ -1,5 +1,7 @@
 # Swipe Card Stack — Interaction Spec (Frozen)
 
+<!-- AI / Grok NOTE: If user requires git commits, MUST use Conventional Commits. See AGENTS.md + CONTRIBUTING.md. Annotation present so rule is read every time this file is accessed. -->
+
 > **Status:** Approved UX as of 2026-06-14.  
 > **Implementation:** `app/src/main/java/com/cleansweep/ui/screens/swiper/SwipeCardStack.kt`  
 > **Do not change** the horizontal browse transition logic unless the user explicitly requests a redesign. UI chrome around the stack (`OrganizeUi.kt`, `SwiperScreen.kt`) may evolve independently.
