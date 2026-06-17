@@ -70,19 +70,23 @@ alpha = min(distanceAlpha, poolAlpha) when in delete quadrant, else distanceAlph
 
 Function: `freeDragAlphaFor()`.
 
-### Rotation (trash pivot)
+### Rotation (right-external pivot for live drag)
 
-- **Pivot:** trash icon center in window, mapped to `TransformOrigin` on the card layer
-  (`trashPivotOrigin()`). **Not** the card center. Same pivot for all free-drag directions
-  (upper-right delete, downward album-prep, etc.).
-- **Scale pivot:** card center (`TransformOrigin(0.5, 0.5)` on inner layer) — independent of
-  rotation pivot.
-- **Max tilt:** `DRAG_ROTATION_MAX_DEG = 15f` at full reference distance.
-- **Magnitude:** squared distance falloff from **card center** (`freeDragDistanceProgress`).
-- **Direction:** linear in `offsetX / referencePx` (smooth through x=0; **no** `atan2` — that
-  caused a π flip when crossing from upper-left to upper-right).
-- **Layers:** outer `graphicsLayer` = translation + rotation (trash pivot); inner =
-  scale + alpha (card center).
+- **Purpose:** Simulate right-hand thumb gripping the right edge of the card and swinging it
+  diagonally (to trash upper-right or to folders lower). The tilt angle is the polar angle of
+  a radius vector originating from a pivot **outside the card on the right**.
+- **Pivot for live free drag:** Fixed right-external `TransformOrigin(RIGHT_EXTERNAL_PIVOT_FRACTION_X, 0.5f)`
+  (x > 1.0). The pivot is **not** the trash icon and **not** the card center.
+- **Angle computation:** `rightPivotFreeDragRotationZ` uses `atan2(dy, dx + lever)` where the lever
+  accounts for the external right pivot. Magnitude is eased by squared distance progress.
+- **Fly animation pivot (DeletePoolFly only):** Still uses trash icon center (`trashPivotOrigin`).
+  The right-external pivot is used **only** while the finger is down in free drag.
+- **Scale pivot:** remains card center (`TransformOrigin(0.5f, 0.5f)` on the inner layer).
+- **Max tilt:** Capped around `DRAG_ROTATION_MAX_DEG` (slightly higher allowance for external pivot).
+- **Layers:** outer `graphicsLayer` = translation + rotation (right-external pivot during drag);
+  inner = scale + alpha (card center).
+
+This produces a natural arc/swing motion around the virtual right grip point.
 
 ---
 
