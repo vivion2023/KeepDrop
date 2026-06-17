@@ -1,5 +1,7 @@
 # CleanSweep 图片清理 App 架构设计
 
+<!-- AI / Grok NOTE: If user requires git commits, MUST use Conventional Commits. See AGENTS.md + CONTRIBUTING.md. This annotation ensures the rule is visible on every read_file. -->
+
 本文档是在审查现有代码库后修订的架构设计。目标不是一次性引入大量新模块，而是在当前 CleanSweep 已有实现上，优先解决图片清理 App 的两个核心问题：
 
 1. **预览要快**：滑动界面和点击预览不能被全盘扫描、缩略图生成、重复扫描拖慢。

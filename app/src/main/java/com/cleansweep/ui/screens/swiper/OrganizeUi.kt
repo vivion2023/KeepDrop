@@ -86,7 +86,7 @@ internal fun OrganizeTopBar(
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 6.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onClose) {
@@ -106,7 +106,7 @@ internal fun OrganizeTopBar(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -185,7 +185,7 @@ internal fun OrganizeMediaMetaLine(
         textAlign = TextAlign.Center,
         modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = 4.dp)
+            .padding(bottom = 2.dp)
     )
 }
 
@@ -200,7 +200,7 @@ internal fun OrganizeActionBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 8.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -210,7 +210,7 @@ internal fun OrganizeActionBar(
                     Icons.Default.Check,
                     contentDescription = null,
                     tint = OrganizeGreen,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             },
             label = stringResource(R.string.organize_action_next),
@@ -223,7 +223,7 @@ internal fun OrganizeActionBar(
                 Surface(
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(24.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                         Text(
@@ -243,7 +243,7 @@ internal fun OrganizeActionBar(
                     Icons.Default.Share,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             },
             label = "",
@@ -255,7 +255,7 @@ internal fun OrganizeActionBar(
                     Icons.Default.Close,
                     contentDescription = null,
                     tint = OrganizeRed,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             },
             label = stringResource(R.string.organize_action_clear),
@@ -277,18 +277,18 @@ private fun OrganizeActionItem(
     val itemModifier = Modifier
         .clip(RoundedCornerShape(8.dp))
         .clickable(onClick = onClick)
-        .padding(horizontal = 8.dp, vertical = if (inlineLabel) 2.dp else 4.dp)
+        .padding(horizontal = 6.dp, vertical = if (inlineLabel) 1.dp else 3.dp)
 
     if (inlineLabel && label.isNotEmpty()) {
         Row(
             modifier = itemModifier,
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             icon()
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelSmall,
                 color = labelColor,
                 fontWeight = FontWeight.Medium
             )
@@ -303,7 +303,7 @@ private fun OrganizeActionItem(
             if (label.isNotEmpty()) {
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     color = labelColor,
                     fontWeight = FontWeight.Medium
                 )
@@ -329,13 +329,13 @@ internal fun OrganizeFolderTransferSection(
         Column(
             modifier = Modifier
                 .navigationBarsPadding()
-                .padding(top = 8.dp, bottom = 6.dp)
+                .padding(top = 12.dp, bottom = 6.dp)
         ) {
             Text(
                 text = stringResource(R.string.organize_transfer_to_album),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),

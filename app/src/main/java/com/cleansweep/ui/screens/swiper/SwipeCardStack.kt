@@ -371,11 +371,11 @@ internal fun SwipeCardStack(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 4.dp, vertical = 2.dp)
+            .padding(horizontal = 2.dp, vertical = 0.dp)
     ) {
         val containerWidth = maxWidth
         val maxCardWidth = containerWidth
-        val maxCardHeight = maxHeight * 0.97f
+        val maxCardHeight = maxHeight * 0.99f
 
         fun cardSizeFor(mediaItem: MediaItem): Pair<Dp, Dp> {
             val aspectRatio = if (mediaItem.width > 0 && mediaItem.height > 0) {

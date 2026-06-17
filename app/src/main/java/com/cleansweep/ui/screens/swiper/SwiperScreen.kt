@@ -713,6 +713,10 @@ private fun OrganizePhoneLayout(
             onShare = onShare,
             onClear = onSwipeToDeletePool
         )
+
+        // Consistent spacing between action bar and folder transfer modules
+        Spacer(modifier = Modifier.height(6.dp))
+
         OrganizeFolderTransferSection(
             targetFolders = targetFolders,
             currentItem = currentItem,
@@ -1395,15 +1399,15 @@ private fun SwipeCardPageContent(
     val cardShape = MaterialTheme.shapes.medium
     Card(
         modifier = modifier.graphicsLayer {
-            shadowElevation = 6f
+            shadowElevation = 3f
             shape = cardShape
             clip = false
-            ambientShadowColor = Color.Black.copy(alpha = 0.18f)
-            spotShadowColor = Color.Black.copy(alpha = 0.14f)
+            ambientShadowColor = Color.Black.copy(alpha = 0.12f)
+            spotShadowColor = Color.Black.copy(alpha = 0.10f)
         },
         shape = cardShape,
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.06f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Box(
