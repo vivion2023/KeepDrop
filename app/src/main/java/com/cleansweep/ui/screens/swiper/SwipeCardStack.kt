@@ -186,28 +186,8 @@ private fun freeDragAlphaFor(
  * This produces an arc/swing motion as if the right thumb is gripping the right edge
  * and the card body is rotating around that grip point (radius angle).
  *
- * Used only for live free drag. Delete-pool fly animation continues to use trash-centered pivot.
+ * Used for live free drag and frozen during delete-pool fly (outer layer).
  */
-/** 
- * Pivot at trash icon center. 
- * Only used during DeletePoolFly animation (live free-drag rotation uses right-external pivot instead).
- */
-private fun trashPivotOrigin(
-    layerWidthPx: Float,
-    layerHeightPx: Float,
-    trashInWindow: Offset?,
-    stackCenterInWindow: Offset?
-): TransformOrigin {
-    if (trashInWindow != null && stackCenterInWindow != null &&
-        layerWidthPx > 0f && layerHeightPx > 0f
-    ) {
-        return TransformOrigin(
-            pivotFractionX = 0.5f + (trashInWindow.x - stackCenterInWindow.x) / layerWidthPx,
-            pivotFractionY = 0.5f + (trashInWindow.y - stackCenterInWindow.y) / layerHeightPx
-        )
-    }
-    return TransformOrigin(0.88f, -0.40f)
-}
 
 private fun lerp(start: Float, end: Float, fraction: Float): Float =
     start + (end - start) * fraction
@@ -244,6 +224,10 @@ private class SwipeGestureState {
     var freeDragEnabled by mutableStateOf(false)
     var freeDragStartAngle by mutableFloatStateOf(0f)
     var freeDragAngleValid by mutableStateOf(false)
+    /** Last rendered rotation during free drag — fallback for fly snapshot. */
+    var freeDragCurrentRotation by mutableFloatStateOf(0f)
+    /** Card layer width from last [graphicsLayer] pass — matches rotation math at release. */
+    var cardLayerWidthPx by mutableFloatStateOf(0f)
     var browseTransitionJob: Job? = null
 
     fun resetAllState(onDeletePoolProgress: (Float) -> Unit) {
@@ -263,6 +247,7 @@ private class SwipeGestureState {
         deleteFlyInProgress = false
         freeDragEnabled = false
         freeDragAngleValid = false
+        freeDragCurrentRotation = 0f
         if (lastReportedDeletePoolProgress != 0f) {
             lastReportedDeletePoolProgress = 0f
             onDeletePoolProgress(0f)
@@ -743,24 +728,21 @@ internal fun SwipeCardStack(
                                         dragRotationReferencePx,
                                         swipeThreshold
                                     )
-                                    // Snapshot the effective (delta) rotation at release for smooth fly start
-                                    if (gesture.freeDragAngleValid) {
-                                        val lever = dragRotationReferencePx * 0.70f
-                                        val dx = offsetX + lever
-                                        val dy = offsetY
-                                        val currentRaw = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
-                                        var delta = currentRaw - gesture.freeDragStartAngle
-                                        // Robust unwrap to [-180, 180]
-                                        delta = delta % 360f
-                                        if (delta > 180f) delta -= 360f
-                                        if (delta < -180f) delta += 360f
-                                        val outward = freeDragDistanceProgress(offsetX, offsetY, dragRotationReferencePx)
-                                        // Use same milder easing as live drag for consistent start rotation
-                                        val rotationEased = outward * 0.85f + (outward * outward) * 0.15f
-                                        val rot = -delta * RIGHT_PIVOT_ANGLE_SCALE * rotationEased
-                                        gesture.deleteFlyStartRotation = rot.coerceIn(-DRAG_ROTATION_MAX_DEG , DRAG_ROTATION_MAX_DEG )
+                                    gesture.deleteFlyStartRotation = if (
+                                        gesture.freeDragAngleValid && gesture.cardLayerWidthPx > 0f
+                                    ) {
+                                        rightPivotFreeDragRotationZ(
+                                            offsetX = offsetX,
+                                            offsetY = offsetY,
+                                            layerWidthPx = gesture.cardLayerWidthPx,
+                                            dragRotationReferencePx = dragRotationReferencePx,
+                                            startAngleDeg = gesture.freeDragStartAngle,
+                                            leverFraction = RIGHT_PIVOT_LEVER_FRACTION,
+                                            angleScale = RIGHT_PIVOT_ANGLE_SCALE,
+                                            maxDeg = DRAG_ROTATION_MAX_DEG
+                                        )
                                     } else {
-                                        gesture.deleteFlyStartRotation = 0f
+                                        gesture.freeDragCurrentRotation
                                     }
                                     val trashWindow = latestDeletePoolFlyTarget.value
                                     val stackWindow = latestCardStackCenter.value
@@ -781,12 +763,9 @@ internal fun SwipeCardStack(
                                         gesture.lastReportedDeletePoolProgress = 0f
                                         reportDeletePoolProgress(0f)
                                     }
-                                    gesture.dragOffsetX = 0f
-                                    gesture.dragOffsetY = 0f
-                                    gesture.freeDragEnabled = false
-                                    gesture.freeDragAngleValid = false
                                     gesture.deleteFlyInProgress = true
                                     gesture.transitionMode = TransitionMode.DeletePoolFly
+                                    gesture.freeDragEnabled = false
                                     launchAnimation {
                                         gesture.deleteFlyProgress.snapTo(0f)
                                         gesture.deleteFlyProgress.animateTo(
@@ -1185,6 +1164,7 @@ private fun BoxScope.CurrentCardLayer(
                 val isFreeDragging = gesture.transitionMode == TransitionMode.Dragging &&
                     gesture.freeDragEnabled
                 val isDeletePoolFlying = gesture.transitionMode == TransitionMode.DeletePoolFly
+                gesture.cardLayerWidthPx = size.width
 
                 if (gesture.zoomScale > 1f) {
                     translationX = gesture.zoomPanX
@@ -1215,10 +1195,8 @@ private fun BoxScope.CurrentCardLayer(
                     else -> 0f
                 }
                 rotationZ = when {
-                    isDeletePoolFlying ->
-                        lerp(gesture.deleteFlyStartRotation, 0f, flyT)
+                    isDeletePoolFlying -> gesture.deleteFlyStartRotation
                     isFreeDragging -> {
-                        // Capture initial angle on first frame of this free drag
                         if (!gesture.freeDragAngleValid) {
                             val lever = size.width * RIGHT_PIVOT_LEVER_FRACTION
                             val dx0 = offsetX + lever
@@ -1226,34 +1204,22 @@ private fun BoxScope.CurrentCardLayer(
                             gesture.freeDragStartAngle = Math.toDegrees(atan2(dy0.toDouble(), dx0.toDouble())).toFloat()
                             gesture.freeDragAngleValid = true
                         }
-
-                        val lever = size.width * RIGHT_PIVOT_LEVER_FRACTION
-                        val dx = offsetX + lever
-                        val dy = offsetY
-                        val currentRaw = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
-
-                        var delta = currentRaw - gesture.freeDragStartAngle
-                        // Robust unwrap to [-180, 180] to prevent sudden jumps when crossing the branch cut
-                        delta = delta % 360f
-                        if (delta > 180f) delta -= 360f
-                        if (delta < -180f) delta += 360f
-
-                        val outward = freeDragDistanceProgress(offsetX, offsetY, dragRotationReferencePx)
-                        // Use milder easing for rotation to feel silkier (less "snappy" than scale/alpha)
-                        val rotationEased = outward * 0.85f + (outward * outward) * 0.15f
-                        val scaled = -delta * RIGHT_PIVOT_ANGLE_SCALE * rotationEased
-                        scaled.coerceIn(-DRAG_ROTATION_MAX_DEG , DRAG_ROTATION_MAX_DEG )
+                        rightPivotFreeDragRotationZ(
+                            offsetX = offsetX,
+                            offsetY = offsetY,
+                            layerWidthPx = size.width,
+                            dragRotationReferencePx = dragRotationReferencePx,
+                            startAngleDeg = gesture.freeDragStartAngle,
+                            leverFraction = RIGHT_PIVOT_LEVER_FRACTION,
+                            angleScale = RIGHT_PIVOT_ANGLE_SCALE,
+                            maxDeg = DRAG_ROTATION_MAX_DEG
+                        ).also { gesture.freeDragCurrentRotation = it }
                     }
                     else -> 0f
                 }
                 transformOrigin = when {
-                    isDeletePoolFlying -> trashPivotOrigin(
-                        layerWidthPx = size.width,
-                        layerHeightPx = size.height,
-                        trashInWindow = deletePoolFlyTargetInWindow,
-                        stackCenterInWindow = cardStackCenterInWindow
-                    )
-                    isFreeDragging -> TransformOrigin(RIGHT_EXTERNAL_PIVOT_FRACTION_X, 0.5f)
+                    isDeletePoolFlying || isFreeDragging ->
+                        TransformOrigin(RIGHT_EXTERNAL_PIVOT_FRACTION_X, 0.5f)
                     else -> TransformOrigin(0.5f, 0.5f)
                 }
                 clip = false
@@ -1281,6 +1247,7 @@ private fun BoxScope.CurrentCardLayer(
                     val isDeletePoolFlying = gesture.transitionMode == TransitionMode.DeletePoolFly
                     val flyShrinkT = deleteFlyShrinkProgress(flyT)
 
+                    // Center pivot throughout fly; outer layer carries the card toward trash while scaling.
                     transformOrigin = TransformOrigin(0.5f, 0.5f)
 
                     if (gesture.zoomScale > 1f) {

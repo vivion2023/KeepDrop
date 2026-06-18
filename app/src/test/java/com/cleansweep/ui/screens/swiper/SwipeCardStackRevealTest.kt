@@ -212,6 +212,33 @@ class SwipeCardStackRevealTest {
     }
 
     @Test
+    fun rightPivotFreeDragRotationZ_isContinuousAtSmallOffsetDelta() {
+        val referencePx = 100f
+        val layerWidthPx = 320f
+        val startAngle = 12f
+        val atRelease = rightPivotFreeDragRotationZ(
+            offsetX = 120f,
+            offsetY = -90f,
+            layerWidthPx = layerWidthPx,
+            dragRotationReferencePx = referencePx,
+            startAngleDeg = startAngle
+        )
+        val slightlyAfter = rightPivotFreeDragRotationZ(
+            offsetX = 121f,
+            offsetY = -89f,
+            layerWidthPx = layerWidthPx,
+            dragRotationReferencePx = referencePx,
+            startAngleDeg = startAngle
+        )
+        assertTrue(kotlin.math.abs(atRelease - slightlyAfter) < 2f)
+    }
+
+    @Test
+    fun deleteFlyShrinkProgress_startsAtZeroForSeamlessReleaseHandoff() {
+        assertEquals(0f, deleteFlyShrinkProgress(0f), 0.001f)
+    }
+
+    @Test
     fun deleteFlyShrinkProgress_isMonotonicWithoutMidFlightPlateau() {
         val atStart = deleteFlyShrinkProgress(0f)
         val mid = deleteFlyShrinkProgress(0.35f)

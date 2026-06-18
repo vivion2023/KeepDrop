@@ -81,6 +81,38 @@ internal fun deleteFlyShrinkProgress(flyT: Float): Float {
     return t * t * (3f - 2f * t)
 }
 
+/**
+ * Rotation during free diagonal drag (right-external pivot). Shared by live drag and fly snapshot.
+ */
+internal fun rightPivotFreeDragRotationZ(
+    offsetX: Float,
+    offsetY: Float,
+    layerWidthPx: Float,
+    dragRotationReferencePx: Float,
+    startAngleDeg: Float,
+    leverFraction: Float = 1.5f,
+    angleScale: Float = 0.25f,
+    maxDeg: Float = 15f
+): Float {
+    if (layerWidthPx <= 0f) return 0f
+    val lever = layerWidthPx * leverFraction
+    val dx = offsetX + lever
+    val dy = offsetY
+    val currentRaw = Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat()
+    var delta = currentRaw - startAngleDeg
+    delta = delta % 360f
+    if (delta > 180f) delta -= 360f
+    if (delta < -180f) delta += 360f
+    val distSq = offsetX * offsetX + offsetY * offsetY
+    val outward = if (dragRotationReferencePx <= 0f || distSq < 100f) {
+        0f
+    } else {
+        (kotlin.math.sqrt(distSq) / dragRotationReferencePx).coerceIn(0f, 1f)
+    }
+    val rotationEased = outward * 0.85f + outward * outward * 0.15f
+    return (-delta * angleScale * rotationEased).coerceIn(-maxDeg, maxDeg)
+}
+
 internal fun isPreviousLayerOnTop(
     transitionMode: TransitionMode,
     horizontalLock: Int,
