@@ -190,6 +190,7 @@
     <string name="video_no_audio_toast">Il video non ha una traccia audio.</string>
     <string name="failed_load_media_prefix">Impossibile caricare i media: %1$s</string>
     <string name="apply_changes_button">Applica Modifiche</string>
+    <string name="organize_apply_button">Applica</string>
     <string name="folder_name_to_edit">Da Modificare</string>
     <string name="cancel_all_changes">Annulla Tutto</string>
     <string name="summary_title_format">Revisione Modifiche (%1$d)</string>

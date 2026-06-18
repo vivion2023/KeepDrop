@@ -154,6 +154,7 @@
     <string name="organize_action_next">Next</string>
     <string name="organize_action_clear">Clear</string>
     <string name="organize_transfer_to_album">Transfer to album…</string>
+    <string name="organize_apply_button">Apply</string>
     <string name="organize_media_counter">%1$d / %2$d · %3$s</string>
     <string name="organize_usage_title">How to use</string>
     <string name="organize_usage_next">Go to the next photo (swipe left)</string>

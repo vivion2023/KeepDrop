@@ -8,6 +8,7 @@
 
 package com.cleansweep.ui.screens.swiper
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -45,6 +46,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -359,6 +361,8 @@ internal fun OrganizeFolderTransferSection(
     targetFavorites: Set<String>,
     onSelectFolder: (String) -> Unit,
     onCreateNewAlbum: () -> Unit,
+    hasPendingChanges: Boolean = false,
+    onApplyChanges: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -371,12 +375,32 @@ internal fun OrganizeFolderTransferSection(
                 .navigationBarsPadding()
                 .padding(top = 12.dp, bottom = 6.dp)
         ) {
-            Text(
-                text = stringResource(R.string.organize_transfer_to_album),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.organize_transfer_to_album),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                AnimatedVisibility(visible = hasPendingChanges) {
+                    TextButton(
+                        onClick = onApplyChanges,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.organize_apply_button),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)

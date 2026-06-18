@@ -111,6 +111,24 @@ In organize/swiper mode (**phone layout** via `OrganizePhoneLayout`), horizontal
 | Next button | `handleKeep()` | `handleKeep()` |
 | Clear / diagonal delete | `handleDelete()` (after fly) | `handleDelete()` (after fly) |
 | Next-card preview | `getUpcomingAdvanceItems()` | `getUpcomingBrowsableItems()` |
+| Apply changes | **应用** in `OrganizeFolderTransferSection` header (phone) | **Apply** in `ControlBar` (expanded) |
+
+### Applying pending changes
+
+While `pendingChanges` is non-empty, an **Apply** button appears inline (phone: right of the “Transfer to album…” row in `OrganizeFolderTransferSection`; expanded: `ControlBar` next to review/undo). Tapping it opens `SummarySheet` (“查看更改”) so the user can review moves, deletes, and keeps before committing.
+
+Two-step commit:
+
+1. **Apply** (inline) → `showSummarySheet()`.
+2. **Apply Changes** (summary sheet) → confirm dialog → `applyChanges()`.
+
+`applyChanges()` then:
+
+1. **Moves** — executes `mediaRepository.moveMedia()` for all pending `Move` / conversion outcomes.
+2. **Deletes** — runs `FinalDeleteUseCase.deleteActiveEntries()` for pending `Delete` items (physical delete; delete-pool entries marked deleted).
+3. **Clears session state** — on success, `completeChanges()` empties `pendingChanges`, `reversibleActions` (undo queue), and summary lists; shows success toast.
+
+Exiting with unsaved changes still shows the unsaved-changes dialog; **Review changes** also opens the summary sheet; **Cancel all changes** discards pool + pending state.
 
 ### Action → Trigger Effect → Records → Undo Effect → Animation
 - **Left swipe** (horizontal lock in stack) **or** "下一个" button: Record decision to *keep* current item, advance to next undecided item (skipping processed via `effectivePending` / `allProcessedIds`). Triggers undo state (icon to ↺).

@@ -65,6 +65,7 @@ Room schema 生成、安装运行和手势行为等更完整的验证，仍在 A
 - **Organize 手机布局**：左滑 /「下一个」= 保留并前进；右滑 = 仅浏览回退；右上斜滑或「清除」= 删除入池并前进。可撤销栈见 `swiper-card-stack.md`。
 - **删除飞入**：右上斜滑过阈值后播放 `DeletePoolFly`（松手位姿连续、飞向垃圾桶并缩小），动画结束再调用 `SwiperViewModel.handleDelete()`。见 `swiper-diagonal-drag.md`。
 - **已删除项不可见**：pending `Delete` 决策作为队列可见性标记；浏览相邻项与前进搜索均跳过，撤销删除后恢复显示。
+- **内联应用更改**：`pendingChanges` 非空时，手机布局在「转移到相册…」行右侧显示 **应用** 按钮（展开布局在 `ControlBar`）；点击先打开 SummarySheet（查看更改列表），用户再点 **应用更改** 并经确认对话框后才调用 `applyChanges()`。
 
 ## 3. 总体架构
 
@@ -147,6 +148,22 @@ DeletePoolManager.add 失败
 ```
 
 与 Organize 撤销的关系：删除入池记入 `reversibleActions`；↺ 撤销会恢复删除池条目、清除 pending Delete，并把该图重新设为当前项（若已前进过）。详见 `swiper-card-stack.md`。
+
+### 4.2.1 应用待定更改
+
+```text
+用户点击内联「应用」或顶部删除池 / 审阅入口
+  -> showSummarySheet()：展示移动、删除、保留分类列表
+用户点击摘要页「应用更改」并确认
+  -> SwiperViewModel.applyChanges()
+  -> 校验 pendingChanges 中文件仍存在
+  -> 执行 Move（mediaRepository.moveMedia）
+  -> 对 Delete 项：FinalDeleteUseCase.deleteActiveEntries（物理删除）
+  -> completeChanges(success)：清空 pendingChanges、reversibleActions、摘要列表
+  -> Toast「更改已成功应用」
+```
+
+与退出确认的关系：`onNavigateUp()` 在 `pendingChanges` 非空时弹出未保存更改对话框；用户可选择审阅（打开 SummarySheet）、放弃全部（`discardAllPendingChangesAndDeletePool`）或取消留在页面。内联「应用」与「审阅更改」一样先打开摘要页，不直接写盘。
 
 性能目标：
 

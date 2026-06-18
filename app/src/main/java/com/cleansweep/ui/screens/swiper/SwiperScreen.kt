@@ -398,6 +398,7 @@ fun SwiperScreen(
                                     onKeep = viewModel::handleKeep,
                                     onDelete = viewModel::handleDelete,
                                     onShowSummary = viewModel::showSummarySheet,
+                                    onApplyChanges = viewModel::showSummarySheet,
                                     onUndo = viewModel::performUndo,
                                     onShare = viewModel::shareCurrentItem,
                                     layout = FolderBarLayout.VERTICAL,
@@ -446,7 +447,9 @@ fun SwiperScreen(
                             hasUndoableActions = uiState.reversibleActions.isNotEmpty(),
                             undoDirection = uiState.undoDirection,
                             undoHandoffItem = uiState.undoHandoffItem,
-                            onUndoCommit = viewModel::commitReversibleUndo
+                            onUndoCommit = viewModel::commitReversibleUndo,
+                            hasPendingChanges = uiState.pendingChanges.isNotEmpty(),
+                            onApplyChanges = viewModel::showSummarySheet
                         )
                     }
                 }
@@ -636,7 +639,9 @@ private fun OrganizePhoneLayout(
     hasUndoableActions: Boolean,
     undoDirection: Int = 0,
     undoHandoffItem: MediaItem? = null,
-    onUndoCommit: () -> Unit = {}
+    onUndoCommit: () -> Unit = {},
+    hasPendingChanges: Boolean = false,
+    onApplyChanges: () -> Unit = {}
 ) {
     var deletePoolSwipeProgress by remember { mutableFloatStateOf(0f) }
     var deletePoolFlyTargetInWindow by remember { mutableStateOf<Offset?>(null) }
@@ -741,7 +746,9 @@ private fun OrganizePhoneLayout(
             currentItem = currentItem,
             targetFavorites = targetFavorites,
             onSelectFolder = onMoveToFolder,
-            onCreateNewAlbum = onCreateNewAlbum
+            onCreateNewAlbum = onCreateNewAlbum,
+            hasPendingChanges = hasPendingChanges,
+            onApplyChanges = onApplyChanges
         )
     }
 }
@@ -885,6 +892,7 @@ private fun ControlBar(
     onKeep: () -> Unit,
     onDelete: () -> Unit,
     onShowSummary: () -> Unit,
+    onApplyChanges: () -> Unit,
     onUndo: () -> Unit,
     onShare: () -> Unit
 ) {
@@ -984,6 +992,24 @@ private fun ControlBar(
                         positioning = TooltipAnchorPosition.Above,
                         spacingBetweenTooltipAndAnchor = 4.dp
                     ),
+                    tooltip = { PlainTooltip { Text(stringResource(R.string.organize_apply_button)) } },
+                    state = rememberTooltipState()
+                ) {
+                    TextButton(onClick = onApplyChanges) {
+                        Text(
+                            text = stringResource(R.string.organize_apply_button),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            AnimatedVisibility(visible = hasPendingChanges) {
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+                        positioning = TooltipAnchorPosition.Above,
+                        spacingBetweenTooltipAndAnchor = 4.dp
+                    ),
                     tooltip = { PlainTooltip { Text(stringResource(R.string.undo_last_action)) } },
                     state = rememberTooltipState()
                 ) {
@@ -1041,6 +1067,7 @@ private fun BottomFolderBar(
     onKeep: () -> Unit,
     onDelete: () -> Unit,
     onShowSummary: () -> Unit,
+    onApplyChanges: () -> Unit,
     onUndo: () -> Unit,
     onShare: () -> Unit,
     layout: FolderBarLayout,
@@ -1100,6 +1127,7 @@ private fun BottomFolderBar(
                     onKeep = onKeep,
                     onDelete = onDelete,
                     onShowSummary = onShowSummary,
+                    onApplyChanges = onApplyChanges,
                     onUndo = onUndo,
                     onShare = onShare
                 )
