@@ -96,3 +96,51 @@ Before merging changes to `SwipeCardStack.kt`:
 3. Right drag: previous slides from left at full opacity; current centered, shrinking, fading.
 4. No horizontal jump on finger release (same `exitDistancePx` for drag progress and commit).
 5. Right swipe looks like left swipe played in reverse.
+
+## Organize Mode: Horizontal Actions, Delete, and Reversible Undo (with Icon Switch)
+
+In organize/swiper mode (phone layout), horizontal gestures and bottom bar buttons perform either **decisions** (affect final summary and "processed" items) or **navigation** (review previous cards). All are reversible. The middle action button switches from "?" (help) to "↺" (undo) as soon as the first reversible action is recorded (`reversibleActions.isNotEmpty()`). Clicking undo reverses the *last* action in LIFO order (from `reversibleActions` history). Undo of decisions removes from `pendingChanges`; browse undos only affect view position. Animations play in reverse where applicable (via `undoDirection` + forced `handoffItem` for correct item during undo).
+
+### Action → Trigger Effect → Records → Undo Effect → Animation
+- **Left swipe** (horizontal lock in stack) **or** "下一个" button: Record decision to *keep* current item, advance to next undecided item (skipping processed via `effectivePending` / `allProcessedIds`). Triggers undo state (icon to ↺).
+  - Records: `ReversibleAction.Decision(Keep(item))` (appended to `reversibleActions`; also to `pendingChanges`).
+  - Undo: Remove the matching Keep from `pendingChanges`. Restore item as current (if advanced past it). 
+  - Animation: Reverse of left (ToPrevious: current comes from left, previous brought in).
+
+- **Right swipe** (horizontal): Browse back to previous item in list (allows review of prior cards, no decision/commit). Triggers undo state.
+  - Records: `ReversibleAction.BrowseBack(forwardIndex = old currentIndex)`.
+  - Undo: Advance forward to the recorded `forwardIndex`.
+  - Animation: Reverse of right (ToNext).
+
+- **Upper-right diagonal (free drag) or "清除" button**: Record decision to *delete* current, add to delete pool, advance to next (skips deleted). Triggers undo state.
+  - Records: `ReversibleAction.Decision(Delete(item))`.
+  - Undo: Remove Delete from `pendingChanges` + `deletePoolMediaKeys` / pool manager restore. Set current to the item (re-show it in swiper list).
+  - Animation: None (or direct state update; current layer shows the restored item).
+
+**Notes**:
+- Left swipe == next button (both keep+advance).
+- Upper-right swipe == clear button (both delete+advance).
+- Browse (right) is *not* a decision; it doesn't add to `pendingChanges` or affect summary. Only affects reversible history for view undo.
+- Browse history is managed via `reversibleActions` (LIFO with decisions).
+- Deleted items not shown in swiper "directory" (see below).
+- Icon back to "?" when `reversibleActions` empty (all undone, back to initial state / first image).
+
+### Not Showing Deleted Images in Swiper List After Delete
+Deleted items must not re-appear in the swipe list (adjacent for gestures, card-stack preview, or next advance) until explicitly restored via undo.
+
+**Implemented mechanism** (pending Delete as visibility mark — Method 1):
+- Delete adds `Decision(Delete)` to `reversibleActions` and `pendingChanges`.
+- `pendingDeleteIndices()` derives hidden list indices from pending `Delete` decisions.
+- **Advance** (`processAndAdvance`): `processedIdsForAdvance()` uses `effectivePending` (decisions with item idx `<= currentIndex`) to build `allProcessedIds`; deleted items are processed → skipped in `nextIndexInList`.
+- **Browse adjacent** (`getAdjacentItemsForBrowse`, `getPreviousBrowsableItem`): skips indices with pending `Delete`.
+- **Browse commit** (`navigateToAdjacentItem` / `handleSwipeRight`): uses `adjacentBrowsableIndexFiltered()` so right-swipe navigation never lands on a pending-delete item (preview and commit stay aligned).
+- **Keep / advance preview** (phone layout): `getUpcomingAdvanceItems()` skips all processed decisions (not only deletes), so the next card shown during left-swipe keep matches the post-advance target. Expanded layout still uses `getUpcomingBrowsableItems()` for pure browse-forward preview.
+- **Undo delete**: `revertChange()` removes the `Decision` from `pendingChanges` and matching entry from `reversibleActions`, restores delete pool, and sets `currentItem` / `currentIndex` when the user had advanced past the item.
+
+**Delete after browse back**: With `effectivePending` (only `<= currentIndex`), after right-swipe back + delete at the back position, advance goes to the immediate next item (even if "kept" earlier in the forward pass), because higher keeps are excluded from processed.
+
+This ensures LIFO undo works interleaved with browse/delete.
+
+See `reversibleActions`, `handle*`, `processAndAdvance`, `revertChange`, `performUndo`, `commitReversibleUndo`, `getAdjacentItemsForBrowse`, `getUpcomingAdvanceItems`, `adjacentBrowsableIndexFiltered` in `SwiperViewModel.kt` / `SwiperBrowseNavigation.kt` / `SwiperScreen.kt`.
+
+## Performance (drag path) (continued)

@@ -135,6 +135,9 @@ data class SwiperUiState(
     val sessionSkippedMediaIds: Set<String> = emptySet(),
     val useFullScreenSummarySheet: Boolean = false,
     val fullScreenSwipe: Boolean = false,
+    val undoDirection: Int = 0,
+    val undoHandoffItem: MediaItem? = null,
+    val reversibleActions: List<ReversibleAction> = emptyList(),
 
 
     // Pre-processed lists for Summary Sheet performance
@@ -257,7 +260,8 @@ class SwiperViewModel @Inject constructor(
                     toDelete = summary.toDelete,
                     toKeep = summary.toKeep,
                     toConvert = summary.toConvert,
-                    groupedMoves = summary.groupedMoves
+                    groupedMoves = summary.groupedMoves,
+                    reversibleActions = savedChanges.map { ReversibleAction.Decision(it) }
                 )
             }
         }
@@ -334,7 +338,8 @@ class SwiperViewModel @Inject constructor(
                         toDelete = summary.toDelete,
                         toKeep = summary.toKeep,
                         toConvert = summary.toConvert,
-                        groupedMoves = summary.groupedMoves
+                        groupedMoves = summary.groupedMoves,
+                        reversibleActions = filterReversibleToPending(state.reversibleActions, validChanges)
                     )
                 }
                 savedStateHandle["pendingChanges"] = ArrayList(validChanges)
@@ -580,6 +585,7 @@ class SwiperViewModel @Inject constructor(
                                         toDelete = summary.toDelete,
                                         toKeep = summary.toKeep,
                                         toConvert = summary.toConvert,
+                                        reversibleActions = filterReversibleToPending(currentState.reversibleActions, updatedChanges) + newDeleteChanges.map { ReversibleAction.Decision(it) },
                                         groupedMoves = summary.groupedMoves
                                     )
                                 }
@@ -652,13 +658,20 @@ class SwiperViewModel @Inject constructor(
                     currentState.sessionSkippedMediaIds
                 }
 
+                val newReversibleActions = if (change != null) {
+                    currentState.reversibleActions + ReversibleAction.Decision(change)
+                } else {
+                    currentState.reversibleActions
+                }
+
                 savedStateHandle["pendingChanges"] = if (newPendingChanges.isNotEmpty()) ArrayList(newPendingChanges) else null
 
                 // Step 2: Find the next item to display
-                val allProcessedIds = sessionProcessedMediaIds +
-                        (if (_rememberProcessedMediaEnabled) processedMediaIds else emptySet()) +
-                        newPendingChanges.map { it.item.id }.toSet() +
-                        newSkippedIds
+                val allProcessedIds = processedIdsForAdvance(
+                    pendingChanges = newPendingChanges,
+                    currentIndex = currentState.currentIndex,
+                    skippedIds = newSkippedIds
+                )
 
                 val nextIndexInList = currentState.allMediaItems
                     .drop(currentState.currentIndex + 1)
@@ -686,6 +699,7 @@ class SwiperViewModel @Inject constructor(
                 currentState.copy(
                     pendingChanges = newPendingChanges,
                     sessionSkippedMediaIds = newSkippedIds,
+                    reversibleActions = newReversibleActions,
                     currentIndex = nextIndex,
                     currentItem = nextItem,
                     isSortingComplete = isSortingComplete,
@@ -697,10 +711,42 @@ class SwiperViewModel @Inject constructor(
                     toDelete = summary.toDelete,
                     toKeep = summary.toKeep,
                     toConvert = summary.toConvert,
-                    groupedMoves = summary.groupedMoves
+                    groupedMoves = summary.groupedMoves,
+
                 )
             }
         }
+    }
+
+    private fun pendingDeleteIndices(pendingChanges: List<PendingChange>, allMediaItems: List<MediaItem>): Set<Int> {
+        val deleteIds = pendingChanges
+            .filter { it.action is SwiperAction.Delete }
+            .map { it.item.id }
+            .toSet()
+        if (deleteIds.isEmpty()) return emptySet()
+        return allMediaItems.indices
+            .filter { allMediaItems[it].id in deleteIds }
+            .toSet()
+    }
+
+    /**
+     * Only pending decisions at or before the current view position count as processed.
+     * Allows advancing to "previously kept" items when at a browsed-back position.
+     */
+    private fun processedIdsForAdvance(
+        pendingChanges: List<PendingChange>,
+        currentIndex: Int,
+        skippedIds: Set<String>
+    ): Set<String> {
+        val allMediaItems = _uiState.value.allMediaItems
+        val effectivePending = pendingChanges.filter { ch ->
+            val idx = allMediaItems.indexOfFirst { it.id == ch.item.id }
+            idx != -1 && idx <= currentIndex
+        }
+        return sessionProcessedMediaIds +
+                (if (_rememberProcessedMediaEnabled) processedMediaIds else emptySet()) +
+                effectivePending.map { it.item.id }.toSet() +
+                skippedIds
     }
 
     /**
@@ -714,6 +760,7 @@ class SwiperViewModel @Inject constructor(
         val currentState = _uiState.value
         currentState.currentItem ?: return emptyList()
 
+        val hiddenIndices = pendingDeleteIndices(currentState.pendingChanges, currentState.allMediaItems)
         val searchRange = if (direction > 0) {
             (currentState.currentIndex + 1)..<currentState.allMediaItems.size
         } else {
@@ -721,7 +768,27 @@ class SwiperViewModel @Inject constructor(
         }
 
         return searchRange
-            .mapNotNull { index -> currentState.allMediaItems.getOrNull(index) }
+            .filter { it !in hiddenIndices }
+            .take(limit)
+            .mapNotNull { currentState.allMediaItems.getOrNull(it) }
+    }
+
+    /** Next card(s) shown during keep/advance gestures (skips all processed decisions). */
+    fun getUpcomingAdvanceItems(limit: Int): List<MediaItem> {
+        if (limit <= 0) return emptyList()
+
+        val currentState = _uiState.value
+        currentState.currentItem ?: return emptyList()
+
+        val allProcessedIds = processedIdsForAdvance(
+            pendingChanges = currentState.pendingChanges,
+            currentIndex = currentState.currentIndex,
+            skippedIds = currentState.sessionSkippedMediaIds
+        )
+
+        return currentState.allMediaItems
+            .drop(currentState.currentIndex + 1)
+            .filterNot { it.id in allProcessedIds }
             .take(limit)
     }
 
@@ -733,6 +800,11 @@ class SwiperViewModel @Inject constructor(
         return getAdjacentItemsForBrowse(direction = 1, limit = limit)
     }
 
+    private fun filterReversibleToPending(reversible: List<ReversibleAction>, pending: List<PendingChange>): List<ReversibleAction> =
+        reversible.filter { action ->
+            action !is ReversibleAction.Decision || pending.any { it.timestamp == action.change.timestamp }
+        }
+
     private fun navigateToAdjacentItem(direction: Int): Boolean {
         if (direction == 0) return false
 
@@ -741,10 +813,12 @@ class SwiperViewModel @Inject constructor(
         _uiState.update { currentState ->
             currentState.currentItem ?: return@update currentState
 
-            val targetIndex = adjacentBrowseIndex(
+            val hiddenIndices = pendingDeleteIndices(currentState.pendingChanges, currentState.allMediaItems)
+            val targetIndex = adjacentBrowsableIndexFiltered(
                 currentIndex = currentState.currentIndex,
                 direction = direction,
-                listSize = currentState.allMediaItems.size
+                listSize = currentState.allMediaItems.size,
+                hiddenIndices = hiddenIndices
             ) ?: return@update currentState
 
             navigated = true
@@ -769,12 +843,20 @@ class SwiperViewModel @Inject constructor(
     }
 
     fun handleSwipeRight(): Boolean {
-        return navigateToAdjacentItem(direction = -1)
+        val currentBefore = _uiState.value.currentIndex
+        val navigated = navigateToAdjacentItem(direction = -1)
+        if (navigated) {
+            _uiState.update {
+                it.copy(reversibleActions = it.reversibleActions + ReversibleAction.BrowseBack(currentBefore))
+            }
+        }
+        return navigated
     }
 
     fun handleKeep() {
         val currentItem = _uiState.value.currentItem ?: return
-        processAndAdvance(PendingChange(currentItem, SwiperAction.Keep(currentItem)))
+        val change = PendingChange(currentItem, SwiperAction.Keep(currentItem))
+        processAndAdvance(change)
     }
 
     fun handleDelete() {
@@ -789,7 +871,12 @@ class SwiperViewModel @Inject constructor(
                 Log.e(logTag, "Failed to add ${currentItem.id} to delete pool", e)
                 deletePoolMediaKeys = deletePoolMediaKeys - currentItem.mediaKey()
                 revertChange(change)
-                _uiState.update { it.copy(toastMessage = context.getString(R.string.error_prefix, e.message ?: context.getString(R.string.unknown_error))) }
+                _uiState.update {
+                    it.copy(
+                        toastMessage = context.getString(R.string.error_prefix, e.message ?: context.getString(R.string.unknown_error)),
+                        reversibleActions = it.reversibleActions.dropLast(1)
+                    )
+                }
             }
         }
     }
@@ -845,6 +932,7 @@ class SwiperViewModel @Inject constructor(
                         toDelete = summary.toDelete,
                         toKeep = summary.toKeep,
                         toConvert = summary.toConvert,
+                        reversibleActions = currentState.reversibleActions + ReversibleAction.Decision(change),
                         groupedMoves = summary.groupedMoves
                     ).also {
                         savedStateHandle["pendingChanges"] = ArrayList(newChanges)
@@ -911,7 +999,10 @@ class SwiperViewModel @Inject constructor(
                         toDelete = summary.toDelete,
                         toKeep = summary.toKeep,
                         toConvert = summary.toConvert,
-                        groupedMoves = summary.groupedMoves
+                        groupedMoves = summary.groupedMoves,
+                        reversibleActions = currentState.reversibleActions.filter { action ->
+                            action !is ReversibleAction.Decision || validatedChanges.any { it.timestamp == action.change.timestamp }
+                        }
                     )
                 }
                 savedStateHandle["pendingChanges"] = ArrayList(validatedChanges)
@@ -1119,6 +1210,7 @@ class SwiperViewModel @Inject constructor(
                 val summary = processSummaryLists(emptyChanges, _uiState.value.folderIdToNameMap)
                 _uiState.update { it.copy(
                     pendingChanges = emptyChanges,
+                    reversibleActions = emptyList(),
                     showSummarySheet = false,
                     isApplyingChanges = false,
                     toastMessage = context.getString(R.string.changes_applied_success),
@@ -1314,7 +1406,12 @@ class SwiperViewModel @Inject constructor(
                         toDelete = summary.toDelete,
                         toKeep = summary.toKeep,
                         toConvert = summary.toConvert,
-                        groupedMoves = summary.groupedMoves
+                        groupedMoves = summary.groupedMoves,
+                        reversibleActions = currentState.reversibleActions.map { ra ->
+                            if (ra is ReversibleAction.Decision && ra.change.action is SwiperAction.Move && ra.change.action.targetFolderPath == oldPath) {
+                                ReversibleAction.Decision(ra.change.copy(action = SwiperAction.Move(ra.change.item, newPath)))
+                            } else ra
+                        }
                     )
                 }
             }.onFailure { error ->
@@ -1479,9 +1576,66 @@ class SwiperViewModel @Inject constructor(
     fun dismissSummarySheet() { _uiState.update { it.copy(showSummarySheet = false) } }
 
     fun revertLastChange() {
-        val lastChange = _uiState.value.pendingChanges.maxByOrNull { it.timestamp }
-        if (lastChange != null) {
-            revertChange(lastChange)
+        clearUndoAnimation()
+        val state = _uiState.value
+        if (state.pendingChanges.isNotEmpty()) {
+            val lastChange = state.pendingChanges.maxByOrNull { it.timestamp }
+            if (lastChange != null) {
+                revertChange(lastChange)
+            }
+        }
+    }
+
+    fun startUndoAnimation(direction: Int, handoffItem: MediaItem? = null) {
+        _uiState.update { it.copy(undoDirection = direction, undoHandoffItem = handoffItem) }
+    }
+
+    fun clearUndoAnimation() {
+        if (_uiState.value.undoDirection != 0 || _uiState.value.undoHandoffItem != null) {
+            _uiState.update { it.copy(undoDirection = 0, undoHandoffItem = null) }
+        }
+    }
+
+    fun commitReversibleUndo() {
+        clearUndoAnimation()
+        val state = _uiState.value
+        if (state.reversibleActions.isEmpty()) return
+        val last = state.reversibleActions.last()
+        _uiState.update { it.copy(reversibleActions = state.reversibleActions.dropLast(1)) }
+        when (last) {
+            is ReversibleAction.BrowseBack -> {
+                val target = last.forwardIndex
+                _uiState.update {
+                    it.copy(
+                        currentIndex = target,
+                        currentItem = it.allMediaItems.getOrNull(target)
+                    )
+                }
+            }
+            is ReversibleAction.Decision -> {
+                revertChange(last.change)
+            }
+        }
+    }
+
+    fun performUndo() {
+        val actions = _uiState.value.reversibleActions
+        if (actions.isEmpty()) return
+        val last = actions.last()
+        val dir = when (last) {
+            is ReversibleAction.BrowseBack -> -1
+            is ReversibleAction.Decision -> if (last.change.action is SwiperAction.Keep) 1 else 0
+            else -> 0
+        }
+        val handoff = when (last) {
+            is ReversibleAction.BrowseBack -> _uiState.value.allMediaItems.getOrNull(last.forwardIndex)
+            is ReversibleAction.Decision -> if (last.change.action is SwiperAction.Keep) last.change.item else null
+            else -> null
+        }
+        if (dir != 0) {
+            startUndoAnimation(dir, handoff)
+        } else {
+            commitReversibleUndo()
         }
     }
 
@@ -1502,13 +1656,18 @@ class SwiperViewModel @Inject constructor(
             val currentSwiperIndex = currentState.currentIndex
             val shouldKeepSheetOpen = currentState.showSummarySheet && updatedPendingChanges.isNotEmpty()
 
+            val updatedReversibleActions = currentState.reversibleActions.filterNot { action ->
+                action is ReversibleAction.Decision && action.change.timestamp == changeToRevert.timestamp
+            }
+
             var finalState = currentState.copy(
                 pendingChanges = updatedPendingChanges,
                 showSummarySheet = shouldKeepSheetOpen,
                 toDelete = summary.toDelete,
                 toKeep = summary.toKeep,
                 toConvert = summary.toConvert,
-                groupedMoves = summary.groupedMoves
+                groupedMoves = summary.groupedMoves,
+                reversibleActions = updatedReversibleActions,
             )
 
             // Case 1: The reverted item is the one currently being displayed (or was, if sorting is complete).
@@ -1578,7 +1737,9 @@ class SwiperViewModel @Inject constructor(
                 toDelete = summary.toDelete,
                 toKeep = summary.toKeep,
                 toConvert = summary.toConvert,
-                groupedMoves = summary.groupedMoves
+                groupedMoves = summary.groupedMoves,
+                reversibleActions = emptyList(),
+                undoHandoffItem = null
             )
         }
     }
@@ -1596,6 +1757,7 @@ class SwiperViewModel @Inject constructor(
                     isSortingComplete = false,
                     sessionSkippedMediaIds = emptySet(),
                     videoPlaybackPosition = 0L,
+                    reversibleActions = emptyList(),
                     videoPlaybackSpeed = _defaultVideoSpeed,
                     isVideoMuted = true,
                     isCurrentItemPendingConversion = false
@@ -1695,4 +1857,12 @@ sealed class SwiperAction : Parcelable {
     data class Screenshot(val item: MediaItem, val timestampMicros: Long = -1L) : SwiperAction()
     @Parcelize
     data class ScreenshotAndDelete(val item: MediaItem, val timestampMicros: Long = -1L) : SwiperAction()
+}
+
+/**
+ * For reversible UI actions in sequence for correct LIFO undo, including browse.
+ */
+sealed class ReversibleAction {
+    data class Decision(val change: PendingChange) : ReversibleAction()
+    data class BrowseBack(val forwardIndex: Int) : ReversibleAction()
 }

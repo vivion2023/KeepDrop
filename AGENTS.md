@@ -44,7 +44,7 @@ This ensures that whenever these files are read (via tools or otherwise), the re
 
 ## Other Notes
 - Prefer editing existing files over creating new ones when possible.
-- For Android/Kotlin changes, run `./gradlew :app:compileDebugKotlin` (or full assemble) to verify before committing.
+- For Android/Kotlin changes, run `./gradlew :app:compileDebugKotlin` (or full assemble) to verify **before committing** — do not skip this step. If the CLI JDK differs from Android Studio, align the environment (e.g. project JDK/toolchain) rather than omitting verification. See `docs/cleaning-app-architecture.md` §2.3.
 - Follow the architecture and coding standards documented in CONTRIBUTING.md.
 - When making UI changes, consider both phone (OrganizePhoneLayout) and expanded layouts.
 

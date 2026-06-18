@@ -44,7 +44,11 @@
 
 ### 2.3 编译验证说明
 
-本阶段的实现不在 Cursor/命令行环境中进行 Gradle 编译验证。当前命令行 Java 环境可能与 Android Studio 使用的 JDK 不一致，容易产生与业务代码无关的构建失败。因此，构建、Room schema 生成、安装运行和手势行为验证由开发者在 Android Studio 中手动完成。
+Android/Kotlin 改动在提交前应通过 Gradle 编译验证（至少 `./gradlew :app:compileDebugKotlin`，或完整 assemble）。AI Agent 与开发者均应在可用环境中执行该验证后再提交。
+
+若命令行 JDK 与 Android Studio 不一致导致构建失败，应先对齐 JDK/环境（例如使用 Android Studio 自带的 JBR 或项目 `gradle.properties` 中配置的 toolchain），不得以环境差异跳过编译验证。
+
+Room schema 生成、安装运行和手势行为等更完整的验证，仍在 Android Studio 或真机/模拟器上由开发者完成。
 
 ## 3. 总体架构
 

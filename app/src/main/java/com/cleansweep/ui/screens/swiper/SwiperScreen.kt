@@ -373,7 +373,10 @@ fun SwiperScreen(
                                 isPendingConversion = uiState.isCurrentItemPendingConversion,
                                 screenshotDeletesVideo = screenshotDeletesVideo,
                                 folderNameLayout = folderNameLayout,
-                                fullScreenSwipe = uiState.fullScreenSwipe
+                                fullScreenSwipe = uiState.fullScreenSwipe,
+                                undoDirection = uiState.undoDirection,
+                                undoHandoffItem = uiState.undoHandoffItem,
+                                onUndoCommit = viewModel::commitReversibleUndo
                             )
                             Box(modifier = Modifier
                                 .fillMaxHeight()
@@ -395,7 +398,7 @@ fun SwiperScreen(
                                     onKeep = viewModel::handleKeep,
                                     onDelete = viewModel::handleDelete,
                                     onShowSummary = viewModel::showSummarySheet,
-                                    onUndo = viewModel::revertLastChange,
+                                    onUndo = viewModel::performUndo,
                                     onShare = viewModel::shareCurrentItem,
                                     layout = FolderBarLayout.VERTICAL,
                                     folderName = if (folderNameLayout == FolderNameLayout.BELOW) uiState.currentItem!!.bucketName else null
@@ -415,7 +418,7 @@ fun SwiperScreen(
                             imageLoader = viewModel.imageLoader,
                             gifImageLoader = viewModel.gifImageLoader,
                             previousItem = viewModel.getPreviousBrowsableItem(),
-                            upcomingItems = viewModel.getUpcomingBrowsableItems(2),
+                            upcomingItems = viewModel.getUpcomingAdvanceItems(2),
                             onSwipeLeft = viewModel::handleSwipeLeft,
                             onSwipeRight = viewModel::handleSwipeRight,
                             onSwipeDown = viewModel::handleSwipeDown,
@@ -437,7 +440,13 @@ fun SwiperScreen(
                             isPendingConversion = uiState.isCurrentItemPendingConversion,
                             screenshotDeletesVideo = screenshotDeletesVideo,
                             fullScreenSwipe = uiState.fullScreenSwipe,
-                            onShowUsageDialog = { showUsageDialog = true }
+                            onShowUsageDialog = { showUsageDialog = true },
+                            onKeep = viewModel::handleKeep,
+                            onUndo = viewModel::performUndo,
+                            hasUndoableActions = uiState.reversibleActions.isNotEmpty(),
+                            undoDirection = uiState.undoDirection,
+                            undoHandoffItem = uiState.undoHandoffItem,
+                            onUndoCommit = viewModel::commitReversibleUndo
                         )
                     }
                 }
@@ -621,7 +630,13 @@ private fun OrganizePhoneLayout(
     isPendingConversion: Boolean,
     screenshotDeletesVideo: Boolean,
     fullScreenSwipe: Boolean,
-    onShowUsageDialog: () -> Unit
+    onShowUsageDialog: () -> Unit,
+    onKeep: () -> Unit,
+    onUndo: () -> Unit,
+    hasUndoableActions: Boolean,
+    undoDirection: Int = 0,
+    undoHandoffItem: MediaItem? = null,
+    onUndoCommit: () -> Unit = {}
 ) {
     var deletePoolSwipeProgress by remember { mutableFloatStateOf(0f) }
     var deletePoolFlyTargetInWindow by remember { mutableStateOf<Offset?>(null) }
@@ -683,7 +698,7 @@ private fun OrganizePhoneLayout(
                 exoPlayer = exoPlayer,
                 imageLoader = imageLoader,
                 gifImageLoader = gifImageLoader,
-                onSwipeLeft = onSwipeLeft,
+                onSwipeLeft = { onKeep(); true },
                 onSwipeRight = onSwipeRight,
                 onSwipeDown = onSwipeDown,
                 onSwipeToDeletePool = onSwipeToDeletePool,
@@ -704,12 +719,16 @@ private fun OrganizePhoneLayout(
                 fullScreenSwipe = fullScreenSwipe,
                 onDeletePoolProgress = onDeletePoolProgress,
                 deletePoolFlyTargetInWindow = deletePoolFlyTargetInWindow,
-                cardStackCenterInWindow = cardStackCenterInWindow
+                cardStackCenterInWindow = cardStackCenterInWindow,
+                undoDirection = undoDirection,
+                undoHandoffItem = undoHandoffItem,
+                onUndoCommit = onUndoCommit
             )
         }
         OrganizeActionBar(
-            onNext = { onSwipeLeft() },
-            onHelp = onShowUsageDialog,
+            onNext = onKeep,
+            onUndoOrHelp = if (hasUndoableActions) onUndo else onShowUsageDialog,
+            showUndo = hasUndoableActions,
             onShare = onShare,
             onClear = onSwipeToDeletePool
         )
@@ -753,7 +772,10 @@ private fun MainContent(
     fullScreenSwipe: Boolean,
     onDeletePoolProgress: (Float) -> Unit = {},
     deletePoolFlyTargetInWindow: Offset? = null,
-    cardStackCenterInWindow: Offset? = null
+    cardStackCenterInWindow: Offset? = null,
+    undoDirection: Int = 0,
+    undoHandoffItem: MediaItem? = null,
+    onUndoCommit: () -> Unit = {}
 ) {
     Column(modifier) {
         if (folderNameLayout == FolderNameLayout.ABOVE) {
@@ -783,7 +805,10 @@ private fun MainContent(
             fullScreenSwipe = fullScreenSwipe,
             onDeletePoolProgress = onDeletePoolProgress,
             deletePoolFlyTargetInWindow = deletePoolFlyTargetInWindow,
-            cardStackCenterInWindow = cardStackCenterInWindow
+            cardStackCenterInWindow = cardStackCenterInWindow,
+            undoDirection = undoDirection,
+            undoHandoffItem = undoHandoffItem,
+            onUndoCommit = onUndoCommit
         )
     }
 }
@@ -1339,7 +1364,10 @@ private fun MediaItemCard(
     fullScreenSwipe: Boolean,
     onDeletePoolProgress: (Float) -> Unit = {},
     deletePoolFlyTargetInWindow: Offset? = null,
-    cardStackCenterInWindow: Offset? = null
+    cardStackCenterInWindow: Offset? = null,
+    undoDirection: Int = 0,
+    undoHandoffItem: MediaItem? = null,
+    onUndoCommit: () -> Unit = {}
 ) {
     val pageContent: @Composable (
         MediaItem,
@@ -1383,6 +1411,9 @@ private fun MediaItemCard(
         deletePoolFlyTargetInWindow = deletePoolFlyTargetInWindow,
         cardStackCenterInWindow = cardStackCenterInWindow,
         onDeletePoolProgress = onDeletePoolProgress,
+        undoDirection = undoDirection,
+        undoHandoffItem = undoHandoffItem,
+        onUndoCommit = onUndoCommit,
         pageContent = pageContent
     )
 }

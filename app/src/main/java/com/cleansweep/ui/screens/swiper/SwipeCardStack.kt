@@ -319,6 +319,9 @@ internal fun SwipeCardStack(
     deletePoolFlyTargetInWindow: Offset? = null,
     cardStackCenterInWindow: Offset? = null,
     onDeletePoolProgress: (Float) -> Unit = {},
+    undoDirection: Int = 0,
+    undoHandoffItem: MediaItem? = null,
+    onUndoCommit: () -> Unit = {},
     pageContent: @Composable (
         mediaItem: MediaItem,
         isCurrent: Boolean,
@@ -334,6 +337,30 @@ internal fun SwipeCardStack(
     val latestItem = rememberUpdatedState(item)
     val latestNextItem = rememberUpdatedState(nextItem)
     val latestPreviousItem = rememberUpdatedState(previousItem)
+
+    LaunchedEffect(undoDirection) {
+        if (undoDirection != 0) {
+            val playToPrevious = undoDirection == 1  // HORIZONTAL_PREVIOUS : undo of left-swipe keep -> play ToPrevious animation (right swipe reverse)
+            gesture.handoffToNext = !playToPrevious
+            gesture.transitionMode = if (playToPrevious) TransitionMode.ToPrevious else TransitionMode.ToNext
+            gesture.handoffOutgoingItem = latestItem.value
+            gesture.handoffItem = undoHandoffItem ?: if (playToPrevious) latestPreviousItem.value else latestNextItem.value
+            gesture.handoffRevealActive = true
+            animationScope.launch {
+                gesture.transitionProgress.snapTo(0f)
+                gesture.transitionProgress.animateTo(
+                    1f,
+                    tween(300, easing = FastOutSlowInEasing)
+                )
+                gesture.transitionProgress.snapTo(0f)
+                gesture.handoffOutgoingItem = null
+                gesture.handoffItem = null
+                gesture.handoffRevealActive = false
+                gesture.transitionMode = TransitionMode.Idle
+                onUndoCommit()
+            }
+        }
+    }
     val latestOnSwipeLeft = rememberUpdatedState(onSwipeLeft)
     val latestOnSwipeRight = rememberUpdatedState(onSwipeRight)
     val latestOnSwipeDown = rememberUpdatedState(onSwipeDown)

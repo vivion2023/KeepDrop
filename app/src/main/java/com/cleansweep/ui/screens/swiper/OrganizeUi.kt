@@ -192,7 +192,8 @@ internal fun OrganizeMediaMetaLine(
 @Composable
 internal fun OrganizeActionBar(
     onNext: () -> Unit,
-    onHelp: () -> Unit,
+    onUndoOrHelp: () -> Unit,
+    showUndo: Boolean,
     onShare: () -> Unit,
     onClear: () -> Unit,
     modifier: Modifier = Modifier
@@ -220,22 +221,31 @@ internal fun OrganizeActionBar(
         )
         OrganizeActionItem(
             icon = {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Text(
-                            "?",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                if (showUndo) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Undo,
+                        contentDescription = stringResource(R.string.undo_last_action),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp)
+                    )
+                } else {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Text(
+                                "?",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             },
             label = "",
-            onClick = onHelp
+            onClick = onUndoOrHelp
         )
         OrganizeActionItem(
             icon = {
