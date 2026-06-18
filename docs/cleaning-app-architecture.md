@@ -7,6 +7,14 @@
 1. **预览要快**：滑动界面和点击预览不能被全盘扫描、缩略图生成、重复扫描拖慢。
 2. **删除要安全**：用户向右上角滑动图片时，只把图片加入 App 管理的删除池；用户最终确认后才物理删除。
 
+## 文档索引
+
+| 文档 | 内容 |
+|------|------|
+| [`swiper-card-stack.md`](swiper-card-stack.md) | 横向浏览动效（冻结）、Organize 模式决策/撤销/队列过滤 |
+| [`swiper-diagonal-drag.md`](swiper-diagonal-drag.md) | 斜向拖拽、删除池飞入动画、手势意图锁定 |
+| 本文档 | 删除池、预览性能、扫描与分阶段落地 |
+
 ## 1. 当前代码库约束
 
 现有工程已经有以下基础：
@@ -15,7 +23,8 @@
 - Room 数据库，当前已有少量 Entity。
 - `MediaRepository` 接口方法较多，职责已经膨胀。
 - `DirectMediaRepositoryImpl` 是主要媒体访问实现。
-- `SwiperScreen` / `SwiperViewModel` 已经承载清理交互。
+- `SwiperScreen` / `SwiperViewModel` 已经承载清理交互（含 Organize 手机布局、可撤销操作栈、删除池入池）。
+- 清理页手势与动效有独立规格文档（见上方索引），实现以代码与 spec 为准。
 - `FileManager` / `FileOperationsHelper` 已经执行文件删除、移动、扫描等操作。
 - `DuplicateScanService` 已有重复/相似扫描流程。
 - 已有 `FolderDetailsCache`、`FileSignatureCache`、`PHashCache` 等缓存。
@@ -50,6 +59,13 @@ Android/Kotlin 改动在提交前应通过 Gradle 编译验证（至少 `./gradl
 
 Room schema 生成、安装运行和手势行为等更完整的验证，仍在 Android Studio 或真机/模拟器上由开发者完成。
 
+### 2.4 交互与 UI 约束（当前实现）
+
+- **竖屏锁定**：`MainActivity` 在 `AndroidManifest.xml` 中设置 `android:screenOrientation="portrait"`，禁用系统自动旋转；宽屏/平板仍通过 `WindowSizeClass` 区分手机与展开布局，而非横屏旋转。
+- **Organize 手机布局**：左滑 /「下一个」= 保留并前进；右滑 = 仅浏览回退；右上斜滑或「清除」= 删除入池并前进。可撤销栈见 `swiper-card-stack.md`。
+- **删除飞入**：右上斜滑过阈值后播放 `DeletePoolFly`（松手位姿连续、飞向垃圾桶并缩小），动画结束再调用 `SwiperViewModel.handleDelete()`。见 `swiper-diagonal-drag.md`。
+- **已删除项不可见**：pending `Delete` 决策作为队列可见性标记；浏览相邻项与前进搜索均跳过，撤销删除后恢复显示。
+
 ## 3. 总体架构
 
 精简后的架构如下：
@@ -57,7 +73,7 @@ Room schema 生成、安装运行和手势行为等更完整的验证，仍在 A
 ```text
 UI
   ├─ SessionSetupScreen
-  ├─ CleanupSwiperScreen
+  ├─ SwiperScreen（清理/Organize 主界面）
   ├─ MediaPreviewScreen
   ├─ DeletePoolScreen
   └─ FinalDeleteDialog / FinalDeleteProgress
@@ -96,7 +112,7 @@ Storage Access
 用户选择文件夹
   -> 继续复用现有 getMediaFromBuckets() 加载媒体
   -> 短期优化为首批尽快返回，避免等待全部扫描/排序
-  -> CleanupSwiperScreen 显示当前图片
+  -> SwiperScreen 显示当前图片
   -> PreviewPrefetcher 预加载后续 3 到 5 张
 ```
 
@@ -109,24 +125,28 @@ Storage Access
 
 ### 4.2 向右上角滑动删除
 
-删除手势定义：
+删除手势定义（阈值与飞入动效见 `swiper-diagonal-drag.md`）：
 
 ```text
-用户将图片向右上角滑动
-  -> 加入删除池
-  -> 当前图片从清理队列移除
-  -> 文件不移动、不删除
+用户将图片向右上角斜滑并松手（超过 swipeThreshold）
+  -> DeletePoolFly：从松手位姿无缝飞向垃圾桶并缩小（无松手瞬间跳变）
+  -> 动画结束后 SwiperViewModel.handleDelete()
+  -> 记录 ReversibleAction.Decision(Delete) + pendingChanges
+  -> processAndAdvance：当前项标记为已处理，前进到下一张未决项
+  -> DeletePoolManager.add(mediaItem) 异步落库
+  -> 文件不移动、不物理删除
 ```
 
-流程：
+失败回滚：
 
 ```text
-CleanupSwiperViewModel.onSwipeToDeletePool(mediaItem)
-  -> 立即更新 UI 队列，进入下一张
-  -> DeletePoolManager.add(mediaItem)
-  -> DeletePoolRepository 插入 delete_pool_entry
-  -> 如果 DB 写入失败，回滚 UI 或提示用户
+DeletePoolManager.add 失败
+  -> revertChange(delete)
+  -> 从 reversibleActions 移除对应 Decision
+  -> Toast 提示用户
 ```
+
+与 Organize 撤销的关系：删除入池记入 `reversibleActions`；↺ 撤销会恢复删除池条目、清除 pending Delete，并把该图重新设为当前项（若已前进过）。详见 `swiper-card-stack.md`。
 
 性能目标：
 
@@ -698,15 +718,17 @@ PhysicalDeleteExecutor.deleteBatch
 
 目标：用户向右上角滑动只加入删除池。
 
+**当前状态（2026-06）：** 核心路径已落地 — `DeletePoolManager`、`handleDelete`、飞入动画、pending Delete 队列过滤、Organize 可撤销栈、删除池摘要入口（`toDelete` / SummarySheet）。后续仍可加强删除池独立列表页与分页体验。
+
 改动：
 
 - 新增 `delete_pool_entry` 表和 DAO。
 - 新增 `DeletePoolRepository`。
 - 新增 `DeletePoolManager`。
-- Swiper 删除手势改为 `DeletePoolManager.add()`。
-- 删除池内媒体从当前清理队列排除。
+- Swiper 删除手势改为 `DeletePoolManager.add()`（经 `SwiperViewModel.handleDelete()`）。
+- 删除池内媒体从当前清理队列排除（pending Delete 过滤 + `processAndAdvance`）。
 - 新增删除池入口和基础列表。
-- 支持恢复。
+- 支持恢复（含 Organize ↺ 与 Summary 单项 revert）。
 
 不做：
 

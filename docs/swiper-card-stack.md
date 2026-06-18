@@ -2,9 +2,10 @@
 
 <!-- AI / Grok NOTE: If user requires git commits, MUST use Conventional Commits. See AGENTS.md + CONTRIBUTING.md. Annotation present so rule is read every time this file is accessed. -->
 
-> **Status:** Approved UX as of 2026-06-14.  
-> **Implementation:** `app/src/main/java/com/cleansweep/ui/screens/swiper/SwipeCardStack.kt`  
-> **Do not change** the horizontal browse transition logic unless the user explicitly requests a redesign. UI chrome around the stack (`OrganizeUi.kt`, `SwiperScreen.kt`) may evolve independently.
+> **Status:** Approved UX as of 2026-06-18.  
+> **Implementation:** `SwipeCardStack.kt`, `SwiperViewModel.kt`, `SwiperScreen.kt`, `SwiperBrowseNavigation.kt`  
+> **Do not change** the horizontal browse transition logic unless the user explicitly requests a redesign. UI chrome around the stack (`OrganizeUi.kt`, `SwiperScreen.kt`) may evolve independently.  
+> **Related:** diagonal delete fly — `docs/swiper-diagonal-drag.md`.
 
 ## Purpose
 
@@ -99,7 +100,17 @@ Before merging changes to `SwipeCardStack.kt`:
 
 ## Organize Mode: Horizontal Actions, Delete, and Reversible Undo (with Icon Switch)
 
-In organize/swiper mode (phone layout), horizontal gestures and bottom bar buttons perform either **decisions** (affect final summary and "processed" items) or **navigation** (review previous cards). All are reversible. The middle action button switches from "?" (help) to "↺" (undo) as soon as the first reversible action is recorded (`reversibleActions.isNotEmpty()`). Clicking undo reverses the *last* action in LIFO order (from `reversibleActions` history). Undo of decisions removes from `pendingChanges`; browse undos only affect view position. Animations play in reverse where applicable (via `undoDirection` + forced `handoffItem` for correct item during undo).
+In organize/swiper mode (**phone layout** via `OrganizePhoneLayout`), horizontal gestures and bottom bar buttons perform either **decisions** (affect final summary and "processed" items) or **navigation** (review previous cards). All are reversible. The middle action button switches from "?" (help) to "↺" (undo) as soon as the first reversible action is recorded (`reversibleActions.isNotEmpty()`). Clicking undo reverses the *last* action in LIFO order (from `reversibleActions` history). Undo of decisions removes from `pendingChanges`; browse undos only affect view position. Animations play in reverse where applicable (via `undoDirection` + `undoHandoffItem` + `commitReversibleUndo` after the stack animation).
+
+**Phone vs expanded wiring** (`SwiperScreen.kt`):
+
+| Gesture / control | Phone (`OrganizePhoneLayout`) | Expanded (`MainContent` + folder bar) |
+|-------------------|-------------------------------|---------------------------------------|
+| Left swipe | `onKeep()` → keep + advance | `handleSwipeLeft()` → browse forward |
+| Right swipe | `handleSwipeRight()` → browse back | `handleSwipeRight()` → browse back |
+| Next button | `handleKeep()` | `handleKeep()` |
+| Clear / diagonal delete | `handleDelete()` (after fly) | `handleDelete()` (after fly) |
+| Next-card preview | `getUpcomingAdvanceItems()` | `getUpcomingBrowsableItems()` |
 
 ### Action → Trigger Effect → Records → Undo Effect → Animation
 - **Left swipe** (horizontal lock in stack) **or** "下一个" button: Record decision to *keep* current item, advance to next undecided item (skipping processed via `effectivePending` / `allProcessedIds`). Triggers undo state (icon to ↺).
@@ -143,4 +154,17 @@ This ensures LIFO undo works interleaved with browse/delete.
 
 See `reversibleActions`, `handle*`, `processAndAdvance`, `revertChange`, `performUndo`, `commitReversibleUndo`, `getAdjacentItemsForBrowse`, `getUpcomingAdvanceItems`, `adjacentBrowsableIndexFiltered` in `SwiperViewModel.kt` / `SwiperBrowseNavigation.kt` / `SwiperScreen.kt`.
 
-## Performance (drag path) (continued)
+### Organize mode regression checklist
+
+Before merging changes to `SwiperViewModel.kt` / `SwiperScreen.kt`:
+
+1. Phone left swipe and Next both keep + advance (not browse forward).
+2. Right swipe browse skips pending-delete items (preview and commit aligned).
+3. Keep-swipe next preview matches post-advance target (`getUpcomingAdvanceItems`).
+4. Undo ↺ reverses last `reversibleActions` entry (Keep, BrowseBack, Delete) in LIFO order.
+5. Undo Keep / BrowseBack plays reverse stack animation; Delete undo is immediate state restore.
+6. Deleted items do not appear in adjacent preview or browse until undo restores them.
+
+## App shell note
+
+`MainActivity` is locked to **portrait** (`android:screenOrientation="portrait"` in `AndroidManifest.xml`) so the organize swiper does not rotate with the system. Expanded-width layout still uses `WindowSizeClass`, not landscape orientation.
