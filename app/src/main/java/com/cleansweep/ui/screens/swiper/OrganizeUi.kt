@@ -8,6 +8,7 @@
 
 package com.cleansweep.ui.screens.swiper
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,12 +29,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -48,15 +49,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -69,6 +75,38 @@ import java.util.Locale
 
 private val OrganizeGreen = Color(0xFF4CAF50)
 private val OrganizeRed = Color(0xFFE53935)
+
+/** Thin-ring help icon — bold sans-serif "?" centered without vertical stretch. */
+@Composable
+private fun OrganizeHelpIcon(
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    size: Dp = 24.dp,
+    strokeWidth: Dp = 1.7.dp,
+    markFontSize: Dp = 13.dp,
+) {
+    val markFontSizeSp = with(LocalDensity.current) { markFontSize.toSp() }
+    val markTextStyle = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Black,
+        fontSize = markFontSizeSp,
+        lineHeight = markFontSizeSp,
+        textAlign = TextAlign.Center,
+        platformStyle = PlatformTextStyle(includeFontPadding = false),
+    )
+    Box(
+        modifier = modifier
+            .size(size)
+            .border(width = strokeWidth, color = tint, shape = CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "?",
+            style = markTextStyle,
+            color = tint,
+        )
+    }
+}
 
 @Composable
 internal fun OrganizeTopBar(
@@ -223,25 +261,17 @@ internal fun OrganizeActionBar(
             icon = {
                 if (showUndo) {
                     Icon(
-                        Icons.AutoMirrored.Filled.Undo,
+                        Icons.Default.Replay,
                         contentDescription = stringResource(R.string.undo_last_action),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(22.dp)
                     )
                 } else {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Text(
-                                "?",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                    OrganizeHelpIcon(
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        size = 24.dp,
+                        strokeWidth = 1.7.dp
+                    )
                 }
             },
             label = "",
@@ -403,10 +433,10 @@ private fun OrganizeFolderColumn(
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                 Icon(
-                    Icons.Default.KeyboardArrowDown,
+                    Icons.Default.ArrowDownward,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(22.dp)
                 )
             }
         }
@@ -495,7 +525,7 @@ internal fun OrganizeUsageDialog(
                 UsageInstructionRow(
                     icon = {
                         Icon(
-                            Icons.Default.KeyboardArrowDown,
+                            Icons.Default.ArrowDownward,
                             null,
                             tint = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(22.dp)
@@ -506,7 +536,7 @@ internal fun OrganizeUsageDialog(
                 UsageInstructionRow(
                     icon = {
                         Icon(
-                            Icons.AutoMirrored.Filled.Undo,
+                            Icons.Default.Replay,
                             null,
                             tint = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(22.dp)
