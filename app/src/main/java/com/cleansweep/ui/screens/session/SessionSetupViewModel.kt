@@ -28,6 +28,7 @@ import com.cleansweep.data.repository.PreferencesRepository
 import com.cleansweep.data.repository.UnselectScanScope
 import com.cleansweep.domain.bus.FolderUpdateEvent
 import com.cleansweep.domain.bus.FolderUpdateEventBus
+import com.cleansweep.data.model.MediaItem
 import com.cleansweep.domain.model.FolderDetails
 import com.cleansweep.domain.repository.MediaRepository
 import com.cleansweep.ui.components.FolderSearchManager
@@ -101,6 +102,9 @@ class SessionSetupViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(SessionSetupUiState())
     val uiState: StateFlow<SessionSetupUiState> = _uiState.asStateFlow()
+
+    private val _coverMediaByFolder = MutableStateFlow<Map<String, MediaItem?>>(emptyMap())
+    val coverMediaByFolder: StateFlow<Map<String, MediaItem?>> = _coverMediaByFolder.asStateFlow()
 
     val searchAutofocusEnabled: StateFlow<Boolean> =
         preferencesRepository.searchAutofocusEnabledFlow
@@ -251,6 +255,19 @@ class SessionSetupViewModel @Inject constructor(
                     initializeSelection(allFolders)
                     hasInitializedSelection = true
                 }
+
+                refreshCoverMedia(allFolders)
+            }
+        }
+    }
+
+    private fun refreshCoverMedia(folders: List<FolderDetails>) {
+        viewModelScope.launch {
+            val paths = folders.map { it.path }
+            _coverMediaByFolder.value = if (paths.isEmpty()) {
+                emptyMap()
+            } else {
+                mediaRepository.getCoverMediaForFolders(paths)
             }
         }
     }
@@ -367,6 +384,17 @@ class SessionSetupViewModel @Inject constructor(
             state.copy(
                 selectedBuckets = (state.selectedBuckets + bucketId).distinct()
             )
+        }
+    }
+
+    fun toggleFolderSelection(folderPath: String) {
+        val state = _uiState.value
+        if (state.isContextualSelectionMode) {
+            toggleContextualSelection(folderPath)
+        } else if (folderPath in state.selectedBuckets) {
+            unselectBucket(folderPath)
+        } else {
+            selectBucket(folderPath)
         }
     }
 

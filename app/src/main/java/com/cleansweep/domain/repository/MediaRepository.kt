@@ -20,6 +20,7 @@ package com.cleansweep.domain.repository
 import com.cleansweep.data.model.MediaItem
 import com.cleansweep.domain.model.FolderDetails
 import com.cleansweep.domain.model.IndexingStatus
+import com.cleansweep.domain.model.YearMonthSection
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -55,6 +56,10 @@ interface MediaRepository {
     suspend fun getMediaStoreKnownPaths(): Set<String>
     suspend fun getAllMediaFilePaths(): Set<String>
     suspend fun getMediaItemsFromPaths(paths: List<String>): List<MediaItem>
+    suspend fun getMediaGroupedByMonth(): List<YearMonthSection>
+    fun getMediaFromMonth(year: Int, month: Int): Flow<List<MediaItem>>
+    suspend fun getCoverMediaForFolder(path: String): MediaItem?
+    suspend fun getCoverMediaForFolders(paths: List<String>): Map<String, MediaItem?>
     suspend fun removeFoldersFromCache(paths: Set<String>)
     suspend fun getIndexingStatus(): IndexingStatus
     suspend fun triggerFullMediaStoreScan(): Boolean

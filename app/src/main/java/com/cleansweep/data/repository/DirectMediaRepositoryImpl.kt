@@ -36,6 +36,8 @@ import com.cleansweep.domain.bus.FolderUpdateEvent
 import com.cleansweep.domain.bus.FolderUpdateEventBus
 import com.cleansweep.domain.model.FolderDetails
 import com.cleansweep.domain.model.IndexingStatus
+import com.cleansweep.domain.model.MonthGroup
+import com.cleansweep.domain.model.YearMonthSection
 import com.cleansweep.domain.repository.MediaRepository
 import com.cleansweep.util.FileManager
 import com.cleansweep.util.FileOperationsHelper
@@ -50,6 +52,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.time.Instant
+import java.time.ZoneId
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -160,13 +164,14 @@ class DirectMediaRepositoryImpl @Inject constructor(
         val mimeType: String?,
         val dateAdded: Long,
         val dateModified: Long,
+        val dateTaken: Long,
         val size: Long,
         val bucketId: String?,
         val bucketName: String?,
         val isVideo: Boolean,
         val width: Int,
         val height: Int,
-        val orientation: Int
+        val orientation: Int,
     )
 
     override suspend fun checkForChangesAndInvalidate(): Boolean = withContext(Dispatchers.IO) {
@@ -332,7 +337,8 @@ class DirectMediaRepositoryImpl @Inject constructor(
             MediaStore.Files.FileColumns.SIZE, MediaStore.Files.FileColumns.BUCKET_ID,
             MediaStore.Files.FileColumns.BUCKET_DISPLAY_NAME, MediaStore.Files.FileColumns.MEDIA_TYPE,
             MediaStore.Files.FileColumns.WIDTH, MediaStore.Files.FileColumns.HEIGHT,
-            MediaStore.MediaColumns.ORIENTATION
+            MediaStore.MediaColumns.ORIENTATION,
+            MediaStore.MediaColumns.DATE_TAKEN,
         )
 
         val selection: String?
@@ -382,6 +388,7 @@ class DirectMediaRepositoryImpl @Inject constructor(
                 val widthColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.WIDTH)
                 val heightColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.HEIGHT)
                 val orientationColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.ORIENTATION)
+                val dateTakenColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_TAKEN)
 
                 while (cursor.moveToNext()) {
                     val path = cursor.getString(dataColumn)
@@ -392,13 +399,14 @@ class DirectMediaRepositoryImpl @Inject constructor(
                             mimeType = cursor.getString(mimeColumn),
                             dateAdded = cursor.getLong(dateAddedColumn),
                             dateModified = cursor.getLong(dateModifiedColumn),
+                            dateTaken = cursor.getLong(dateTakenColumn),
                             size = cursor.getLong(sizeColumn),
                             bucketId = cursor.getString(bucketIdColumn),
                             bucketName = cursor.getString(bucketNameColumn),
                             isVideo = cursor.getInt(mediaTypeColumn) == MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO,
                             width = cursor.getInt(widthColumn),
                             height = cursor.getInt(heightColumn),
-                            orientation = cursor.getInt(orientationColumn)
+                            orientation = cursor.getInt(orientationColumn),
                         )
                     }
                 }
@@ -1383,4 +1391,87 @@ class DirectMediaRepositoryImpl @Inject constructor(
         Log.d(logTag, "Triggering full scan for ${unindexedPaths.size} items.")
         return@withContext scanPathsAndWait(unindexedPaths)
     }
+
+    private fun effectiveTimestamp(cache: MediaStoreCache): Long {
+        return if (cache.dateTaken > 0) {
+            cache.dateTaken
+        } else {
+            cache.dateModified * 1000
+        }
+    }
+
+    private fun yearMonthFromCache(cache: MediaStoreCache): Pair<Int, Int> {
+        val zdt = Instant.ofEpochMilli(effectiveTimestamp(cache)).atZone(ZoneId.systemDefault())
+        return zdt.year to zdt.monthValue
+    }
+
+    override suspend fun getMediaGroupedByMonth(): List<YearMonthSection> = withContext(Dispatchers.IO) {
+        val mediaMap = getMediaStoreDataForBuckets(null)
+        val monthGroups = mediaMap.entries
+            .groupBy { (_, cache) -> yearMonthFromCache(cache) }
+            .map { (yearMonth, entries) ->
+                val coverEntry = entries.maxByOrNull { (_, cache) -> effectiveTimestamp(cache) }
+                val coverMedia = coverEntry?.let { (path, cache) ->
+                    createMediaItemFromMediaStore(File(path), cache)
+                }
+                MonthGroup(
+                    year = yearMonth.first,
+                    month = yearMonth.second,
+                    itemCount = entries.size,
+                    coverMedia = coverMedia,
+                )
+            }
+
+        monthGroups
+            .groupBy { it.year }
+            .map { (year, months) ->
+                YearMonthSection(
+                    year = year,
+                    months = months.sortedByDescending { it.month },
+                )
+            }
+            .sortedByDescending { it.year }
+    }
+
+    override fun getMediaFromMonth(year: Int, month: Int): Flow<List<MediaItem>> = flow {
+        val mediaMap = getMediaStoreDataForBuckets(null)
+        val items = mediaMap.entries
+            .filter { (_, cache) ->
+                val (itemYear, itemMonth) = yearMonthFromCache(cache)
+                itemYear == year && itemMonth == month
+            }
+            .sortedByDescending { (_, cache) -> effectiveTimestamp(cache) }
+            .map { (path, cache) -> createMediaItemFromMediaStore(File(path), cache) }
+        emit(items)
+    }.flowOn(Dispatchers.IO)
+
+    override suspend fun getCoverMediaForFolder(path: String): MediaItem? = withContext(Dispatchers.IO) {
+        val mediaMap = getMediaStoreDataForBuckets(listOf(path))
+        val latest = mediaMap.maxByOrNull { (_, cache) -> effectiveTimestamp(cache) }
+            ?: run {
+                val file = getMostRecentFileInDirectory(File(path)) ?: return@withContext null
+                return@withContext createMediaItemFromFile(file)
+            }
+        createMediaItemFromMediaStore(File(latest.key), latest.value)
+    }
+
+    override suspend fun getCoverMediaForFolders(paths: List<String>): Map<String, MediaItem?> =
+        withContext(Dispatchers.IO) {
+            if (paths.isEmpty()) return@withContext emptyMap()
+
+            val mediaMap = getMediaStoreDataForBuckets(paths)
+
+            paths.associateWith { path ->
+                val bucketId = path.lowercase(Locale.ROOT).hashCode().toString()
+                val latest = mediaMap.entries
+                    .filter { (_, cache) -> cache.bucketId == bucketId }
+                    .maxByOrNull { (_, cache) -> effectiveTimestamp(cache) }
+
+                latest?.let { (filePath, cache) ->
+                    createMediaItemFromMediaStore(File(filePath), cache)
+                } ?: getMostRecentFileInDirectory(File(path))?.let { file ->
+                    createMediaItemFromFile(file)
+                }
+            }
+        }
 }

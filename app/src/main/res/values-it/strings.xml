@@ -33,6 +33,16 @@
     <string name="nav_tab_gallery">Galleria</string>
     <string name="gallery_placeholder_title">In arrivo</string>
     <string name="gallery_placeholder_desc">Sfoglia le cartelle per copertina. Disponibile in un aggiornamento futuro.</string>
+    <string name="organize_segment_date">Data</string>
+    <string name="organize_segment_album">Album</string>
+    <string name="organize_view_list">Vista elenco</string>
+    <string name="organize_view_cards">Vista schede</string>
+    <string name="organize_year_label">%1$d</string>
+    <string name="organize_no_media_by_date">Nessun media trovato per data</string>
+    <plurals name="organize_media_count">
+        <item quantity="one">%d elemento</item>
+        <item quantity="other">%d elementi</item>
+    </plurals>
     <string name="more_options">Altre opzioni</string>
     <string name="navigate_back">Torna indietro</string>
     <string name="unknown_error">Si è verificato un errore sconosciuto</string>

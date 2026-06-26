@@ -31,6 +31,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
@@ -64,7 +67,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.cleansweep.R
+import com.cleansweep.data.repository.OrganizeViewMode
 import com.cleansweep.domain.model.FolderDetails
+import com.cleansweep.ui.components.organize.MediaCoverCard
 import com.cleansweep.ui.components.AppDialog
 import com.cleansweep.ui.components.AppDropdownMenu
 import com.cleansweep.ui.components.AppMenuDivider
@@ -87,9 +92,12 @@ fun SessionSetupScreen(
     onNavigateToSettings: () -> Unit = {},
     onNavigateToDuplicates: () -> Unit = {},
     showShellNavigationActions: Boolean = true,
+    hideTopBar: Boolean = false,
+    organizeViewMode: OrganizeViewMode = OrganizeViewMode.LIST,
     viewModel: SessionSetupViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val coverMediaByFolder by viewModel.coverMediaByFolder.collectAsState()
     val folderSearchState by viewModel.folderSearchManager.state.collectAsState()
     val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
@@ -201,23 +209,25 @@ fun SessionSetupScreen(
             })
         },
         topBar = {
-            if (uiState.isContextualSelectionMode) {
-                ContextualTopAppBar(
-                    selectionCount = uiState.contextSelectedFolderPaths.size,
-                    canFavorite = uiState.canFavoriteContextualSelection,
-                    onClose = viewModel::exitContextualSelectionMode,
-                    onSelectAll = viewModel::contextualSelectAll,
-                    onMarkAsSorted = viewModel::markSelectedFoldersAsSorted,
-                    onToggleFavorite = viewModel::toggleFavoriteForSelectedFolders
-                )
-            } else {
-                DefaultTopAppBar(
-                    uiState = uiState,
-                    showShellNavigationActions = showShellNavigationActions,
-                    onNavigateToDuplicates = onNavigateToDuplicates,
-                    onSortOptionChange = viewModel::changeSortOption,
-                    onNavigateToSettings = onNavigateToSettings,
-                )
+            if (!hideTopBar) {
+                if (uiState.isContextualSelectionMode) {
+                    ContextualTopAppBar(
+                        selectionCount = uiState.contextSelectedFolderPaths.size,
+                        canFavorite = uiState.canFavoriteContextualSelection,
+                        onClose = viewModel::exitContextualSelectionMode,
+                        onSelectAll = viewModel::contextualSelectAll,
+                        onMarkAsSorted = viewModel::markSelectedFoldersAsSorted,
+                        onToggleFavorite = viewModel::toggleFavoriteForSelectedFolders
+                    )
+                } else {
+                    DefaultTopAppBar(
+                        uiState = uiState,
+                        showShellNavigationActions = showShellNavigationActions,
+                        onNavigateToDuplicates = onNavigateToDuplicates,
+                        onSortOptionChange = viewModel::changeSortOption,
+                        onNavigateToSettings = onNavigateToSettings,
+                    )
+                }
             }
         },
         floatingActionButton = {
@@ -412,64 +422,110 @@ fun SessionSetupScreen(
                     else -> {
                         val listState = rememberLazyListState()
                         Box(modifier = Modifier.fillMaxSize()) {
-                            LazyColumn(
-                                state = listState,
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(
-                                    start = 16.dp,
-                                    end = 16.dp,
-                                    top = 8.dp,
-                                    bottom = 96.dp
-                                ),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                uiState.folderCategories.forEach { category ->
-                                    if (category.folders.isNotEmpty()) {
-                                        item {
-                                            Text(
-                                                text = category.name,
-                                                style = MaterialTheme.typography.titleMedium,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
-                                            )
-                                        }
-                                        items(category.folders, key = { it.path }) { folder ->
-                                            val isSelectedForSession = folder.path in uiState.selectedBuckets
-                                            val isSelectedForContext = folder.path in uiState.contextSelectedFolderPaths
-                                            EnhancedFolderItem(
-                                                folder = folder,
-                                                isSelected = if (uiState.isContextualSelectionMode) isSelectedForContext else isSelectedForSession,
-                                                isContextualMode = uiState.isContextualSelectionMode,
-                                                isFavorite = folder.path in uiState.favoriteFolders,
-                                                isRecursiveRoot = folder.path in uiState.recursivelySelectedRoots,
-                                                onToggle = {
-                                                    if (uiState.isContextualSelectionMode) {
-                                                        viewModel.toggleContextualSelection(folder.path)
-                                                    } else {
-                                                        if (isSelectedForSession) {
-                                                            viewModel.unselectBucket(folder.path)
-                                                        } else {
-                                                            viewModel.selectBucket(folder.path)
-                                                        }
+                            if (organizeViewMode == OrganizeViewMode.CARD) {
+                                LazyColumn(
+                                    state = listState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(
+                                        start = 16.dp,
+                                        end = 16.dp,
+                                        top = 8.dp,
+                                        bottom = 96.dp,
+                                    ),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    uiState.folderCategories.forEach { category ->
+                                        if (category.folders.isNotEmpty()) {
+                                            item(key = "header-${category.name}") {
+                                                Text(
+                                                    text = category.name,
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.padding(vertical = 4.dp),
+                                                )
+                                            }
+                                            item(key = "grid-${category.name}") {
+                                                LazyVerticalGrid(
+                                                    columns = GridCells.Fixed(3),
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                                    userScrollEnabled = false,
+                                                ) {
+                                                    items(category.folders, key = { it.path }) { folder ->
+                                                        FolderCoverCardItem(
+                                                            folder = folder,
+                                                            uiState = uiState,
+                                                            coverMediaByFolder = coverMediaByFolder,
+                                                            onToggle = { viewModel.toggleFolderSelection(folder.path) },
+                                                            onLongPress = { viewModel.enterContextualSelectionMode(folder.path) },
+                                                        )
                                                     }
-                                                },
-                                                onLongPress = {
-                                                    viewModel.enterContextualSelectionMode(folder.path)
-                                                },
-                                                onToggleFavorite = { viewModel.toggleFavorite(folder.path) },
-                                                onSelectRecursively = { viewModel.selectFolderRecursively(folder.path) },
-                                                onDeselectRecursively = { viewModel.deselectChildren(folder.path) },
-                                                onRename = { viewModel.showRenameDialog(folder.path) },
-                                                onMove = { viewModel.showMoveFolderDialog(folder.path) },
-                                                onMarkAsSorted = { viewModel.markFolderAsSorted(folder) }
-                                            )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                LazyColumn(
+                                    state = listState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(
+                                        start = 16.dp,
+                                        end = 16.dp,
+                                        top = 8.dp,
+                                        bottom = 96.dp,
+                                    ),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    uiState.folderCategories.forEach { category ->
+                                        if (category.folders.isNotEmpty()) {
+                                            item {
+                                                Text(
+                                                    text = category.name,
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+                                                )
+                                            }
+                                            items(category.folders, key = { it.path }) { folder ->
+                                                val isSelectedForSession = folder.path in uiState.selectedBuckets
+                                                val isSelectedForContext = folder.path in uiState.contextSelectedFolderPaths
+                                                EnhancedFolderItem(
+                                                    folder = folder,
+                                                    isSelected = if (uiState.isContextualSelectionMode) isSelectedForContext else isSelectedForSession,
+                                                    isContextualMode = uiState.isContextualSelectionMode,
+                                                    isFavorite = folder.path in uiState.favoriteFolders,
+                                                    isRecursiveRoot = folder.path in uiState.recursivelySelectedRoots,
+                                                    onToggle = {
+                                                        if (uiState.isContextualSelectionMode) {
+                                                            viewModel.toggleContextualSelection(folder.path)
+                                                        } else {
+                                                            if (isSelectedForSession) {
+                                                                viewModel.unselectBucket(folder.path)
+                                                            } else {
+                                                                viewModel.selectBucket(folder.path)
+                                                            }
+                                                        }
+                                                    },
+                                                    onLongPress = {
+                                                        viewModel.enterContextualSelectionMode(folder.path)
+                                                    },
+                                                    onToggleFavorite = { viewModel.toggleFavorite(folder.path) },
+                                                    onSelectRecursively = { viewModel.selectFolderRecursively(folder.path) },
+                                                    onDeselectRecursively = { viewModel.deselectChildren(folder.path) },
+                                                    onRename = { viewModel.showRenameDialog(folder.path) },
+                                                    onMove = { viewModel.showMoveFolderDialog(folder.path) },
+                                                    onMarkAsSorted = { viewModel.markFolderAsSorted(folder) },
+                                                )
+                                            }
                                         }
                                     }
                                 }
                             }
                             FastScrollbar(
                                 state = listState,
-                                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 4.dp)
+                                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 4.dp),
                             )
                         }
                     }
@@ -894,6 +950,35 @@ private fun formatPathForDisplay(path: String): Pair<String, String> {
     val parentPath = file.parent?.replace("/storage/emulated/0", "") ?: ""
     val displayParent = if (parentPath.length > 30) "...${parentPath.takeLast(27)}" else parentPath
     return Pair(name, displayParent)
+}
+
+@Composable
+private fun FolderCoverCardItem(
+    folder: FolderDetails,
+    uiState: SessionSetupUiState,
+    coverMediaByFolder: Map<String, com.cleansweep.data.model.MediaItem?>,
+    onToggle: () -> Unit,
+    onLongPress: () -> Unit,
+) {
+    val isSelectedForSession = folder.path in uiState.selectedBuckets
+    val isSelectedForContext = folder.path in uiState.contextSelectedFolderPaths
+    val isSelected = if (uiState.isContextualSelectionMode) isSelectedForContext else isSelectedForSession
+    val coverMedia = coverMediaByFolder[folder.path]
+    val subtitle = pluralStringResource(
+        R.plurals.organize_media_count,
+        folder.itemCount,
+        folder.itemCount,
+    )
+
+    MediaCoverCard(
+        title = folder.name,
+        subtitle = subtitle,
+        coverUri = coverMedia?.uri,
+        isVideo = coverMedia?.isVideo == true,
+        isSelected = isSelected,
+        onClick = onToggle,
+        onLongClick = onLongPress,
+    )
 }
 
 private fun formatFileSize(size: Long): String {

@@ -114,7 +114,8 @@ import androidx.compose.material3.ButtonDefaults
 @Composable
 fun SwiperScreen(
     windowSizeClass: WindowSizeClass,
-    bucketIds: List<String>,
+    bucketIds: List<String> = emptyList(),
+    monthYear: Pair<Int, Int>? = null,
     onNavigateUp: () -> Unit,
     onNavigateUpAndReset: () -> Unit,
     onNavigateToSettings: () -> Unit = {},
@@ -217,8 +218,11 @@ fun SwiperScreen(
             exoPlayer.playWhenReady = true
         }
     }
-    LaunchedEffect(bucketIds) {
-        viewModel.initializeMedia(bucketIds)
+    LaunchedEffect(bucketIds, monthYear) {
+        when (val month = monthYear) {
+            null -> viewModel.initializeMedia(bucketIds)
+            else -> viewModel.initializeMediaByMonth(month.first, month.second)
+        }
     }
     LaunchedEffect(uiState.toastMessage) {
         uiState.toastMessage?.let { message ->
@@ -338,7 +342,15 @@ fun SwiperScreen(
         ) {
             when {
                 uiState.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                uiState.error != null -> ErrorMessage(message = uiState.error!!, onRetry = { viewModel.initializeMedia(bucketIds) })
+                uiState.error != null -> ErrorMessage(
+                    message = uiState.error!!,
+                    onRetry = {
+                        when (val month = monthYear) {
+                            null -> viewModel.initializeMedia(bucketIds)
+                            else -> viewModel.initializeMediaByMonth(month.first, month.second)
+                        }
+                    },
+                )
                 uiState.currentItem != null -> {
                     if (isExpandedScreen) {
                         Row(modifier = Modifier.fillMaxSize()) {

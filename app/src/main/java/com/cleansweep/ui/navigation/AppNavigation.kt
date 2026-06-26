@@ -60,6 +60,10 @@ sealed class Screen(val route: String) {
         }
     }
 
+    object SwiperMonth : Screen("swiper/month/{year}/{month}") {
+        fun createRoute(year: Int, month: Int): String = "swiper/month/$year/$month"
+    }
+
     object Settings : Screen("settings")
     object Libraries : Screen("libraries")
 

@@ -230,6 +230,7 @@ class SwiperViewModel @Inject constructor(
 
 
     private var bucketIds: List<String> = emptyList()
+    private var monthYear: Pair<Int, Int>? = null
     private var _invertSwipe = false
     private var processedMediaIds = emptySet<String>()
     private var deletePoolMediaKeys = emptySet<String>()
@@ -521,8 +522,13 @@ class SwiperViewModel @Inject constructor(
     }
 
     fun initializeMedia(sourceBucketIds: List<String>) {
-        if (this.bucketIds == sourceBucketIds && !_uiState.value.isLoading && _uiState.value.allMediaItems.isNotEmpty()) return
+        if (this.bucketIds == sourceBucketIds && monthYear == null &&
+            !_uiState.value.isLoading && _uiState.value.allMediaItems.isNotEmpty()
+        ) {
+            return
+        }
         this.bucketIds = sourceBucketIds
+        this.monthYear = null
         unindexedFileCounter.set(0)
 
         viewModelScope.launch {
@@ -615,6 +621,77 @@ class SwiperViewModel @Inject constructor(
                         }
                     }
 
+            } catch (e: Exception) {
+                val errorMessage = context.getString(R.string.failed_load_media_prefix, e.message)
+                _uiState.update { it.copy(isLoading = false, error = errorMessage) }
+            }
+        }
+    }
+
+    fun initializeMediaByMonth(year: Int, month: Int) {
+        val newMonthYear = year to month
+        if (this.monthYear == newMonthYear && !_uiState.value.isLoading && _uiState.value.allMediaItems.isNotEmpty()) {
+            return
+        }
+        this.monthYear = newMonthYear
+        this.bucketIds = emptyList()
+        unindexedFileCounter.set(0)
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    error = null,
+                    allMediaItems = emptyList(),
+                    currentIndex = 0,
+                    currentItem = null,
+                    isSortingComplete = false,
+                )
+            }
+
+            try {
+                val initialLayout = folderBarLayout.first()
+                val lastExpandedState = preferencesRepository.bottomBarExpandedFlow.first()
+                _uiState.update {
+                    it.copy(isFolderBarExpanded = initialLayout == FolderBarLayout.VERTICAL || lastExpandedState)
+                }
+
+                val latestProcessedPaths = if (_rememberProcessedMediaEnabled) {
+                    preferencesRepository.processedMediaPathsFlow.first()
+                } else {
+                    emptySet()
+                }
+                processedMediaIds = latestProcessedPaths
+                deletePoolMediaKeys = deletePoolManager.getActiveMediaKeys()
+
+                val allItems = mediaRepository.getMediaFromMonth(year, month).first().toMutableList()
+                val allProcessedIds = sessionProcessedMediaIds + processedMediaIds + deletePoolMediaKeys
+                val firstUnprocessedIndex = allItems.indexOfFirst { it.mediaKey() !in allProcessedIds }
+
+                if (firstUnprocessedIndex != -1) {
+                    _uiState.update {
+                        it.copy(
+                            allMediaItems = allItems,
+                            isLoading = false,
+                            isSortingComplete = false,
+                            currentIndex = firstUnprocessedIndex,
+                            currentItem = allItems[firstUnprocessedIndex],
+                            videoPlaybackPosition = 0L,
+                            videoPlaybackSpeed = _defaultVideoSpeed,
+                            isCurrentItemPendingConversion = false,
+                        )
+                    }
+                    prewarmNextImages()
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            allMediaItems = allItems,
+                            isLoading = false,
+                            isSortingComplete = true,
+                            currentItem = null,
+                        )
+                    }
+                }
             } catch (e: Exception) {
                 val errorMessage = context.getString(R.string.failed_load_media_prefix, e.message)
                 _uiState.update { it.copy(isLoading = false, error = errorMessage) }

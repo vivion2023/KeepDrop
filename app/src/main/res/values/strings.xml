@@ -34,6 +34,16 @@
     <string name="nav_tab_gallery">Gallery</string>
     <string name="gallery_placeholder_title">Coming soon</string>
     <string name="gallery_placeholder_desc">Browse folders by cover photo. Available in a future update.</string>
+    <string name="organize_segment_date">Date</string>
+    <string name="organize_segment_album">Albums</string>
+    <string name="organize_view_list">List view</string>
+    <string name="organize_view_cards">Card view</string>
+    <string name="organize_year_label">%1$d</string>
+    <string name="organize_no_media_by_date">No photos or videos found by date</string>
+    <plurals name="organize_media_count">
+        <item quantity="one">%d item</item>
+        <item quantity="other">%d items</item>
+    </plurals>
     <string name="more_options">More options</string>
     <string name="navigate_back">Navigate back</string>
     <string name="previous_image">Previous image</string>

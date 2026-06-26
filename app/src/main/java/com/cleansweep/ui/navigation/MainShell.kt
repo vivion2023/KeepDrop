@@ -48,7 +48,7 @@ import com.cleansweep.ui.screens.duplicates.DuplicatesViewModel
 import com.cleansweep.ui.screens.duplicates.GroupDetailsScreen
 import com.cleansweep.ui.screens.gallery.GalleryPlaceholderScreen
 import com.cleansweep.ui.screens.osslicenses.OpenSourceLicensesScreen
-import com.cleansweep.ui.screens.session.SessionSetupScreen
+import com.cleansweep.ui.screens.organize.OrganizeScreen
 import com.cleansweep.ui.screens.session.SessionSetupViewModel
 import com.cleansweep.ui.screens.settings.SettingsScreen
 import com.cleansweep.ui.screens.swiper.SwiperScreen
@@ -120,7 +120,7 @@ fun MainShell(
             }
 
             composable(MainTab.Organize.route) { backStackEntry ->
-                val viewModel = hiltViewModel<SessionSetupViewModel>()
+                val folderViewModel = hiltViewModel<SessionSetupViewModel>()
 
                 val result by backStackEntry
                     .savedStateHandle
@@ -129,26 +129,21 @@ fun MainShell(
 
                 LaunchedEffect(result) {
                     if (result) {
-                        viewModel.handleResetResult()
+                        folderViewModel.handleResetResult()
                     }
                 }
 
-                LaunchedEffect(forceRefreshOrganize) {
-                    if (forceRefreshOrganize) {
-                        viewModel.refreshFolders()
-                    }
-                }
-
-                SessionSetupScreen(
+                OrganizeScreen(
                     windowSizeClass = windowSizeClass,
-                    showShellNavigationActions = false,
+                    forceRefresh = forceRefreshOrganize,
                     onStartSession = { bucketIds ->
-                        viewModel.saveSelectedBucketsPreference()
+                        folderViewModel.saveSelectedBucketsPreference()
                         innerNavController.navigate(Screen.Swiper.createRoute(bucketIds))
                     },
-                    onNavigateToSettings = { navigateToTab(MainTab.Settings) },
-                    onNavigateToDuplicates = { navigateToTab(MainTab.Duplicates) },
-                    viewModel = viewModel,
+                    onStartMonthSession = { year, month ->
+                        innerNavController.navigate(Screen.SwiperMonth.createRoute(year, month))
+                    },
+                    folderViewModel = folderViewModel,
                 )
             }
 
@@ -183,6 +178,26 @@ fun MainShell(
                             ?.set(RESET_SEARCH_RESULT_KEY, true)
                         innerNavController.popBackStack()
                     },
+                    onNavigateToSettings = { navigateToTab(MainTab.Settings) },
+                    onNavigateToDuplicates = { navigateToTab(MainTab.Duplicates) },
+                )
+            }
+
+            composable(
+                route = Screen.SwiperMonth.route,
+                arguments = listOf(
+                    navArgument("year") { type = NavType.IntType },
+                    navArgument("month") { type = NavType.IntType },
+                ),
+            ) { backStackEntry ->
+                val year = backStackEntry.arguments?.getInt("year") ?: return@composable
+                val month = backStackEntry.arguments?.getInt("month") ?: return@composable
+
+                SwiperScreen(
+                    windowSizeClass = windowSizeClass,
+                    monthYear = year to month,
+                    onNavigateUp = { innerNavController.navigateUp() },
+                    onNavigateUpAndReset = { innerNavController.popBackStack() },
                     onNavigateToSettings = { navigateToTab(MainTab.Settings) },
                     onNavigateToDuplicates = { navigateToTab(MainTab.Duplicates) },
                 )

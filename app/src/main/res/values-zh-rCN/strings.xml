@@ -34,6 +34,15 @@
     <string name="nav_tab_gallery">相册</string>
     <string name="gallery_placeholder_title">即将推出</string>
     <string name="gallery_placeholder_desc">按文件夹封面快速浏览，将在后续版本中提供。</string>
+    <string name="organize_segment_date">日期</string>
+    <string name="organize_segment_album">相簿</string>
+    <string name="organize_view_list">列表视图</string>
+    <string name="organize_view_cards">卡片视图</string>
+    <string name="organize_year_label">%1$d年</string>
+    <string name="organize_no_media_by_date">未找到按日期分组的媒体</string>
+    <plurals name="organize_media_count">
+        <item quantity="other">%d 项</item>
+    </plurals>
     <string name="more_options">更多选项</string>
     <string name="navigate_back">返回上一页</string>
     <string name="previous_image">上一张图片</string>

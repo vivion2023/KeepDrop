@@ -99,6 +99,16 @@ enum class UnselectScanScope {
     VISIBLE_ONLY
 }
 
+enum class OrganizeViewMode {
+    CARD,
+    LIST,
+}
+
+enum class OrganizeSegment {
+    DATE,
+    ALBUM,
+}
+
 enum class AppLocale(val tag: String?) {
     SYSTEM(null),
     ENGLISH("en"),
@@ -168,6 +178,7 @@ class PreferencesRepository @Inject constructor(
         val SHOW_CONFIRM_RESET_TARGET_FAVS = booleanPreferencesKey("show_confirm_reset_target_favs")
         val SHOW_CONFIRM_DELETE_ALL_EXACT = booleanPreferencesKey("show_confirm_delete_all_exact")
         val UNSELECT_ALL_IN_SEARCH_SCOPE = stringPreferencesKey("unselect_all_in_search_scope")
+        val ORGANIZE_VIEW_MODE = stringPreferencesKey("organize_view_mode")
     }
 
     val themeFlow: Flow<AppTheme> = context.dataStore.data
@@ -248,6 +259,16 @@ class PreferencesRepository @Inject constructor(
                 SummaryViewMode.valueOf(modeName)
             } catch (e: IllegalArgumentException) {
                 SummaryViewMode.LIST
+            }
+        }
+
+    val organizeViewModeFlow: Flow<OrganizeViewMode> = context.dataStore.data
+        .map { preferences ->
+            val modeName = preferences[PreferencesKeys.ORGANIZE_VIEW_MODE] ?: OrganizeViewMode.CARD.name
+            try {
+                OrganizeViewMode.valueOf(modeName)
+            } catch (_: IllegalArgumentException) {
+                OrganizeViewMode.CARD
             }
         }
 
@@ -554,6 +575,12 @@ class PreferencesRepository @Inject constructor(
     suspend fun setSummaryViewMode(mode: SummaryViewMode) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.SUMMARY_VIEW_MODE] = mode.name
+        }
+    }
+
+    suspend fun setOrganizeViewMode(mode: OrganizeViewMode) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.ORGANIZE_VIEW_MODE] = mode.name
         }
     }
 
