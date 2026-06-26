@@ -92,9 +92,10 @@ private const val MAX_VISUAL_SCALE = 2.0f
 @Composable
 fun DuplicatesScreen(
     viewModel: DuplicatesViewModel,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: () -> Unit = {},
     onNavigateToGroup: (String) -> Unit,
     onNavigateToSettings: () -> Unit,
+    showBackNavigation: Boolean = true,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -225,16 +226,18 @@ fun DuplicatesScreen(
             TopAppBar(
                 title = { Text(title) },
                 navigationIcon = {
-                    TooltipBox(
-                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
-                            positioning = TooltipAnchorPosition.Above,
-                            spacingBetweenTooltipAndAnchor = 4.dp
-                        ),
-                        tooltip = { PlainTooltip { Text(stringResource(R.string.navigate_back)) } },
-                        state = rememberTooltipState()
-                    ) {
-                        IconButton(onClick = onNavigateUp) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.navigate_back))
+                    if (showBackNavigation) {
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+                                positioning = TooltipAnchorPosition.Above,
+                                spacingBetweenTooltipAndAnchor = 4.dp,
+                            ),
+                            tooltip = { PlainTooltip { Text(stringResource(R.string.navigate_back)) } },
+                            state = rememberTooltipState(),
+                        ) {
+                            IconButton(onClick = onNavigateUp) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.navigate_back))
+                            }
                         }
                     }
                 },

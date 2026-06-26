@@ -84,8 +84,9 @@ import kotlin.math.pow
 fun SessionSetupScreen(
     windowSizeClass: WindowSizeClass,
     onStartSession: (List<String>) -> Unit,
-    onNavigateToSettings: () -> Unit,
-    onNavigateToDuplicates: () -> Unit,
+    onNavigateToSettings: () -> Unit = {},
+    onNavigateToDuplicates: () -> Unit = {},
+    showShellNavigationActions: Boolean = true,
     viewModel: SessionSetupViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -212,9 +213,10 @@ fun SessionSetupScreen(
             } else {
                 DefaultTopAppBar(
                     uiState = uiState,
+                    showShellNavigationActions = showShellNavigationActions,
                     onNavigateToDuplicates = onNavigateToDuplicates,
                     onSortOptionChange = viewModel::changeSortOption,
-                    onNavigateToSettings = onNavigateToSettings
+                    onNavigateToSettings = onNavigateToSettings,
                 )
             }
         },
@@ -548,22 +550,25 @@ private fun NoSearchResultsMessage(searchQuery: String, modifier: Modifier = Mod
 @Composable
 private fun DefaultTopAppBar(
     uiState: SessionSetupUiState,
+    showShellNavigationActions: Boolean,
     onNavigateToDuplicates: () -> Unit,
     onSortOptionChange: (FolderSortOption) -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
 ) {
     TopAppBar(
         title = { Text(stringResource(R.string.select_folders_title)) },
         actions = {
             var showSortMenu by remember { mutableStateOf(false) }
 
-            TooltipBox(
-                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(positioning = TooltipAnchorPosition.Above),
-                tooltip = { PlainTooltip { Text(stringResource(R.string.find_duplicates)) } },
-                state = rememberTooltipState()
-            ) {
-                IconButton(onClick = onNavigateToDuplicates) {
-                    Icon(Icons.Default.ControlPointDuplicate, contentDescription = stringResource(R.string.find_duplicates))
+            if (showShellNavigationActions) {
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(positioning = TooltipAnchorPosition.Above),
+                    tooltip = { PlainTooltip { Text(stringResource(R.string.find_duplicates)) } },
+                    state = rememberTooltipState(),
+                ) {
+                    IconButton(onClick = onNavigateToDuplicates) {
+                        Icon(Icons.Default.ControlPointDuplicate, contentDescription = stringResource(R.string.find_duplicates))
+                    }
                 }
             }
 
@@ -634,13 +639,15 @@ private fun DefaultTopAppBar(
                         })
                 }
             }
-            TooltipBox(
-                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(positioning = TooltipAnchorPosition.Above),
-                tooltip = { PlainTooltip { Text(stringResource(R.string.settings)) } },
-                state = rememberTooltipState()
-            ) {
-                IconButton(onClick = onNavigateToSettings) {
-                    Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings))
+            if (showShellNavigationActions) {
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(positioning = TooltipAnchorPosition.Above),
+                    tooltip = { PlainTooltip { Text(stringResource(R.string.settings)) } },
+                    state = rememberTooltipState(),
+                ) {
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings))
+                    }
                 }
             }
         }

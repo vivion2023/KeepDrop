@@ -11,6 +11,7 @@
 
 | 文档 | 内容 |
 |------|------|
+| [`ui-refactor-design.md`](ui-refactor-design.md) | **UI 重构**：底部四 Tab 导航、整理/相册/重复项/设置（待实现） |
 | [`swiper-card-stack.md`](swiper-card-stack.md) | 横向浏览动效（冻结）、Organize 模式决策/撤销/队列过滤 |
 | [`swiper-diagonal-drag.md`](swiper-diagonal-drag.md) | 斜向拖拽、删除池飞入动画、手势意图锁定 |
 | 本文档 | 删除池、预览性能、扫描与分阶段落地 |

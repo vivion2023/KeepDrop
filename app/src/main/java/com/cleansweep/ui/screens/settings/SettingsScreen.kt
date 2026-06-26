@@ -155,9 +155,10 @@ private data class SettingSection(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onNavigateUp: () -> Unit,
+    onNavigateUp: () -> Unit = {},
     onNavigateToLibraries: () -> Unit,
-    viewModel: SettingsViewModel = hiltViewModel()
+    showBackNavigation: Boolean = true,
+    viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val debouncedSearchQuery by viewModel.debouncedSearchQuery.collectAsState()
@@ -272,11 +273,13 @@ fun SettingsScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateUp) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.navigate_back)
-                        )
+                    if (showBackNavigation) {
+                        IconButton(onClick = onNavigateUp) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.navigate_back),
+                            )
+                        }
                     }
                 },
                 actions = {

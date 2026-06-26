@@ -78,9 +78,9 @@ fun MainApp(
         true -> {
             if (hasAllFilesAccess) {
                 val startDestination = if (justGrantedAccess) {
-                    Screen.SessionSetup.createRoute(forceRefresh = true)
+                    Screen.MainShell.createRoute(forceRefresh = true)
                 } else {
-                    Screen.SessionSetup.createRoute(forceRefresh = false)
+                    Screen.MainShell.createRoute()
                 }
 
                 AppNavigation(

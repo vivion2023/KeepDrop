@@ -28,6 +28,11 @@
     <string name="close">Chiudi</string>
     <string name="back">Indietro</string>
     <string name="settings">Impostazioni</string>
+    <string name="nav_tab_duplicates">Duplicati</string>
+    <string name="nav_tab_organize">Organizza</string>
+    <string name="nav_tab_gallery">Galleria</string>
+    <string name="gallery_placeholder_title">In arrivo</string>
+    <string name="gallery_placeholder_desc">Sfoglia le cartelle per copertina. Disponibile in un aggiornamento futuro.</string>
     <string name="more_options">Altre opzioni</string>
     <string name="navigate_back">Torna indietro</string>
     <string name="unknown_error">Si è verificato un errore sconosciuto</string>
