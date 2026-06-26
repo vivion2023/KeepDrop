@@ -43,7 +43,7 @@ fun MonthGroupCardGrid(
     sections: List<YearMonthSection>,
     onMonthClick: (MonthGroup) -> Unit,
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
+    contentPadding: PaddingValues = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -91,7 +91,7 @@ fun MonthGroupList(
     sections: List<YearMonthSection>,
     onMonthClick: (MonthGroup) -> Unit,
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
+    contentPadding: PaddingValues = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),

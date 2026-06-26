@@ -17,6 +17,7 @@
 
 package com.cleansweep.ui.navigation
 
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -91,6 +92,7 @@ fun MainShell(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             if (showBottomBar) {
                 MainBottomNavigationBar(
@@ -103,7 +105,7 @@ fun MainShell(
         NavHost(
             navController = innerNavController,
             startDestination = MainTab.Organize.route,
-            modifier = Modifier.padding(paddingValues),
+            modifier = Modifier.padding(bottom = paddingValues.calculateBottomPadding()),
         ) {
             composable(MainTab.Duplicates.route) { backStackEntry ->
                 val viewModel = hiltViewModel<DuplicatesViewModel>(backStackEntry)

@@ -60,6 +60,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -106,6 +107,8 @@ fun SessionSetupScreen(
     val isExpandedScreen = windowSizeClass.widthSizeClass > WindowWidthSizeClass.Compact
     val pullToRefreshState = rememberPullToRefreshState()
     val logTag ="SessionSetupScreen"
+    val listBottomPadding = if (hideTopBar) 8.dp else 96.dp
+    val emptyStateBottomClearance = if (hideTopBar) 16.dp else 64.dp
 
     BackHandler(enabled = uiState.isContextualSelectionMode) {
         viewModel.exitContextualSelectionMode()
@@ -206,6 +209,11 @@ fun SessionSetupScreen(
                 focusManager.clearFocus()
             })
         },
+        contentWindowInsets = if (hideTopBar) {
+            WindowInsets(0, 0, 0, 0)
+        } else {
+            ScaffoldDefaults.contentWindowInsets
+        },
         topBar = {
             if (!hideTopBar) {
                 if (uiState.isContextualSelectionMode) {
@@ -229,6 +237,7 @@ fun SessionSetupScreen(
             }
         },
         floatingActionButton = {
+            if (!hideTopBar) {
             AnimatedVisibility(
                 visible = !uiState.isContextualSelectionMode,
                 enter = fadeIn(),
@@ -320,17 +329,32 @@ fun SessionSetupScreen(
                     }
                 }
             }
+            }
         },
         floatingActionButtonPosition = if (isExpandedScreen) FabPosition.End else FabPosition.Center
     ) { paddingValues ->
-        Column(modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues)) {
+        val visibleFolders = uiState.folderCategories.flatMap { it.folders }
+        val areAllVisibleSelected = visibleFolders.isNotEmpty() &&
+            visibleFolders.all { it.path in uiState.selectedBuckets }
+        val isSelectAllMode = !areAllVisibleSelected
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (hideTopBar) {
+                        Modifier
+                    } else {
+                        Modifier.padding(paddingValues)
+                    },
+                ),
+        ) {
             TextField(
                 value = uiState.searchQuery,
                 onValueChange = { viewModel.updateSearchQuery(it) },
                 modifier = Modifier
                     .fillMaxWidth()
+                    .then(if (hideTopBar) Modifier.padding(top = 4.dp) else Modifier)
                     .focusRequester(focusRequester),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -353,7 +377,11 @@ fun SessionSetupScreen(
                 isRefreshing = uiState.isRefreshing,
                 onRefresh = viewModel::refreshFolders,
                 state = pullToRefreshState,
-                modifier = Modifier.fillMaxSize(),
+                modifier = if (hideTopBar) {
+                    Modifier.weight(1f)
+                } else {
+                    Modifier.fillMaxSize()
+                },
                 indicator = {
                     PullToRefreshDefaults.Indicator(
                         state = pullToRefreshState,
@@ -398,7 +426,10 @@ fun SessionSetupScreen(
                     uiState.allFolderDetails.isEmpty() -> {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
                             item {
-                                EmptyStateMessage(modifier = Modifier.fillParentMaxSize())
+                                EmptyStateMessage(
+                                    modifier = Modifier.fillParentMaxSize(),
+                                    bottomClearance = emptyStateBottomClearance,
+                                )
                             }
                         }
                     }
@@ -410,7 +441,8 @@ fun SessionSetupScreen(
                             item {
                                 NoSearchResultsMessage(
                                     searchQuery = uiState.searchQuery,
-                                    modifier = Modifier.fillParentMaxSize()
+                                    modifier = Modifier.fillParentMaxSize(),
+                                    bottomClearance = emptyStateBottomClearance,
                                 )
                             }
                         }
@@ -428,7 +460,7 @@ fun SessionSetupScreen(
                                         start = 16.dp,
                                         end = 16.dp,
                                         top = 8.dp,
-                                        bottom = 96.dp,
+                                        bottom = listBottomPadding,
                                     ),
                                     verticalArrangement = Arrangement.spacedBy(12.dp),
                                 ) {
@@ -466,7 +498,7 @@ fun SessionSetupScreen(
                                         start = 16.dp,
                                         end = 16.dp,
                                         top = 8.dp,
-                                        bottom = 96.dp,
+                                        bottom = listBottomPadding,
                                     ),
                                     verticalArrangement = Arrangement.spacedBy(4.dp),
                                 ) {
@@ -523,12 +555,88 @@ fun SessionSetupScreen(
                     }
                 }
             }
+
+            if (hideTopBar && !uiState.isContextualSelectionMode) {
+                SessionSelectionActionBar(
+                    isSelectAllMode = isSelectAllMode,
+                    hasSelection = uiState.selectedBuckets.isNotEmpty(),
+                    onSelectAllToggle = {
+                        if (isSelectAllMode) {
+                            viewModel.selectAll()
+                        } else {
+                            viewModel.unselectAll()
+                        }
+                    },
+                    onStartSession = {
+                        if (uiState.selectedBuckets.isNotEmpty()) {
+                            viewModel.saveSelectedBucketsPreference()
+                            onStartSession(uiState.selectedBuckets)
+                        }
+                    },
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun EmptyStateMessage(modifier: Modifier = Modifier) {
+private fun SessionSelectionActionBar(
+    isSelectAllMode: Boolean,
+    hasSelection: Boolean,
+    onSelectAllToggle: () -> Unit,
+    onStartSession: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        ExtendedFloatingActionButton(
+            onClick = onSelectAllToggle,
+            modifier = Modifier.weight(1f),
+            containerColor = MaterialTheme.colorScheme.secondary,
+            contentColor = MaterialTheme.colorScheme.onSecondary,
+        ) {
+            Icon(
+                imageVector = if (isSelectAllMode) Icons.Default.CheckBoxOutlineBlank else Icons.Default.CheckBox,
+                contentDescription = null,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                if (isSelectAllMode) {
+                    stringResource(R.string.select_all)
+                } else {
+                    stringResource(R.string.unselect_all)
+                },
+            )
+        }
+        ExtendedFloatingActionButton(
+            onClick = onStartSession,
+            modifier = Modifier.weight(1f),
+            containerColor = if (hasSelection) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            },
+            contentColor = if (hasSelection) {
+                MaterialTheme.colorScheme.onPrimary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        ) {
+            Icon(Icons.Default.Check, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.start_session))
+        }
+    }
+}
+
+@Composable
+private fun EmptyStateMessage(
+    modifier: Modifier = Modifier,
+    bottomClearance: Dp = 64.dp,
+) {
     Box(
         modifier = modifier
             .padding(16.dp),
@@ -537,7 +645,7 @@ private fun EmptyStateMessage(modifier: Modifier = Modifier) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.padding(bottom = 64.dp) // Offset from FABs
+            modifier = Modifier.padding(bottom = bottomClearance)
         ) {
             Icon(
                 imageVector = Icons.Default.PhotoLibrary,
@@ -561,7 +669,11 @@ private fun EmptyStateMessage(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun NoSearchResultsMessage(searchQuery: String, modifier: Modifier = Modifier) {
+private fun NoSearchResultsMessage(
+    searchQuery: String,
+    modifier: Modifier = Modifier,
+    bottomClearance: Dp = 64.dp,
+) {
     Box(
         modifier = modifier
             .padding(16.dp),
@@ -570,7 +682,7 @@ private fun NoSearchResultsMessage(searchQuery: String, modifier: Modifier = Mod
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.padding(bottom = 64.dp) // Offset from FABs
+            modifier = Modifier.padding(bottom = bottomClearance)
         ) {
             Icon(
                 imageVector = Icons.Default.SearchOff,
