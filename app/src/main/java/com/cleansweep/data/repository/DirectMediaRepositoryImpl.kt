@@ -42,6 +42,10 @@ import com.cleansweep.domain.repository.MediaRepository
 import com.cleansweep.util.FileManager
 import com.cleansweep.util.FileOperationsHelper
 import com.cleansweep.util.ImageDimensions
+import com.cleansweep.util.canonicalMediaPath
+import com.cleansweep.util.isDisplayableMediaFile
+import com.cleansweep.util.isExcludedMediaFileName
+import com.cleansweep.util.isInAlbumFolders
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -255,6 +259,14 @@ class DirectMediaRepositoryImpl @Inject constructor(
         }
         Log.d(logTag, "Starting batched media fetch for buckets: $bucketIds")
 
+        val albumFolderPaths = bucketIds.map { path ->
+            try {
+                File(path).canonicalPath
+            } catch (_: Exception) {
+                path
+            }
+        }.toSet()
+
         // Step 1: Pre-fetch all available MediaStore data for the target buckets into a map for fast lookups.
         val mediaStoreDataMap = getMediaStoreDataForBuckets(bucketIds)
         Log.d(logTag, "Pre-fetched ${mediaStoreDataMap.size} items from MediaStore.")
@@ -264,6 +276,7 @@ class DirectMediaRepositoryImpl @Inject constructor(
         val subsequentBatchSize = 20
         val batch = mutableListOf<MediaItem>()
         val unindexedPathsToScan = mutableListOf<String>()
+        val seenPaths = mutableSetOf<String>()
         var isFirstBatch = true
 
         val indexedEntries = mediaStoreDataMap.entries
@@ -272,7 +285,18 @@ class DirectMediaRepositoryImpl @Inject constructor(
         for ((path, cache) in indexedEntries) {
             currentCoroutineContext().ensureActive()
             val file = File(path)
-            if (!file.exists()) continue
+            if (!isInAlbumFolders(file, albumFolderPaths)) continue
+            val canonicalPath = canonicalMediaPath(file)
+            if (!seenPaths.add(canonicalPath)) continue
+            if (!isDisplayableMediaFile(
+                    file = file,
+                    isVideo = cache.isVideo,
+                    cachedWidth = cache.width,
+                    cachedHeight = cache.height,
+                )
+            ) {
+                continue
+            }
 
             batch.add(createMediaItemFromMediaStore(file, cache))
 
@@ -290,7 +314,10 @@ class DirectMediaRepositoryImpl @Inject constructor(
                 try {
                     File(bucketPath)
                         .listFiles { file -> file.isFile && isMediaFile(file) }
-                        ?.filter { it.absolutePath !in mediaStoreDataMap }
+                        ?.filter { file ->
+                            canonicalMediaPath(file) !in mediaStoreDataMap &&
+                                isInAlbumFolders(file, albumFolderPaths)
+                        }
                         ?.toList() ?: emptyList()
                 } catch (e: Exception) {
                     Log.e(logTag, "Error reading files from bucket: $bucketPath", e)
@@ -302,6 +329,11 @@ class DirectMediaRepositoryImpl @Inject constructor(
 
         for (file in unindexedFiles) {
             currentCoroutineContext().ensureActive()
+            val canonicalPath = canonicalMediaPath(file)
+            if (!seenPaths.add(canonicalPath)) continue
+            if (!isDisplayableMediaFile(file, isVideo = supportedVideoExtensions.contains(file.extension.lowercase(Locale.ROOT)))) {
+                continue
+            }
             unindexedPathsToScan.add(file.absolutePath)
             createMediaItemFromFile(file)?.let { batch.add(it) }
 
@@ -392,8 +424,24 @@ class DirectMediaRepositoryImpl @Inject constructor(
 
                 while (cursor.moveToNext()) {
                     val path = cursor.getString(dataColumn)
+                    val displayName = cursor.getString(nameColumn)
                     if (!path.isNullOrBlank()) {
-                        cacheMap[path] = MediaStoreCache(
+                        val file = File(path)
+                        if (isExcludedMediaFileName(file.name) || isExcludedMediaFileName(displayName)) {
+                            continue
+                        }
+                        if (bucketPaths != null) {
+                            val albumFolderPaths = bucketPaths.map { folderPath ->
+                                try {
+                                    File(folderPath).canonicalPath
+                                } catch (_: Exception) {
+                                    folderPath
+                                }
+                            }.toSet()
+                            if (!isInAlbumFolders(file, albumFolderPaths)) continue
+                        }
+                        val canonicalPath = canonicalMediaPath(file)
+                        cacheMap[canonicalPath] = MediaStoreCache(
                             id = cursor.getLong(idColumn),
                             displayName = cursor.getString(nameColumn),
                             mimeType = cursor.getString(mimeColumn),
@@ -537,6 +585,7 @@ class DirectMediaRepositoryImpl @Inject constructor(
     }
 
     private fun isMediaFile(file: File): Boolean {
+        if (isExcludedMediaFileName(file.name)) return false
         val extension = file.extension.lowercase(Locale.ROOT)
         return supportedImageExtensions.contains(extension) || supportedVideoExtensions.contains(extension)
     }
@@ -925,7 +974,10 @@ class DirectMediaRepositoryImpl @Inject constructor(
                     val path = cursor.getString(dataColumn) ?: continue
                     if (path in processedPaths) continue
 
-                    val parentPath = File(path).parent ?: continue
+                    val file = File(path)
+                    if (!file.exists() || file.length() <= 0L || isExcludedMediaFileName(file.name)) continue
+
+                    val parentPath = file.parent ?: continue
                     if (parentPath in permanentlySortedFolders) continue
 
                     val aggregate = folderAggregates.getOrPut(parentPath) {
@@ -1407,7 +1459,23 @@ class DirectMediaRepositoryImpl @Inject constructor(
 
     override suspend fun getMediaGroupedByMonth(): List<YearMonthSection> = withContext(Dispatchers.IO) {
         val mediaMap = getMediaStoreDataForBuckets(null)
-        val monthGroups = mediaMap.entries
+        val seenPaths = mutableSetOf<String>()
+        val displayableEntries = mediaMap.entries.mapNotNull { (path, cache) ->
+            val file = File(path)
+            val canonicalPath = canonicalMediaPath(file)
+            if (!seenPaths.add(canonicalPath)) return@mapNotNull null
+            if (!isDisplayableMediaFile(
+                    file = file,
+                    isVideo = cache.isVideo,
+                    cachedWidth = cache.width,
+                    cachedHeight = cache.height,
+                )
+            ) {
+                return@mapNotNull null
+            }
+            path to cache
+        }
+        val monthGroups = displayableEntries
             .groupBy { (_, cache) -> yearMonthFromCache(cache) }
             .map { (yearMonth, entries) ->
                 val coverEntry = entries.maxByOrNull { (_, cache) -> effectiveTimestamp(cache) }
@@ -1435,13 +1503,28 @@ class DirectMediaRepositoryImpl @Inject constructor(
 
     override fun getMediaFromMonth(year: Int, month: Int): Flow<List<MediaItem>> = flow {
         val mediaMap = getMediaStoreDataForBuckets(null)
+        val seenPaths = mutableSetOf<String>()
         val items = mediaMap.entries
             .filter { (_, cache) ->
                 val (itemYear, itemMonth) = yearMonthFromCache(cache)
                 itemYear == year && itemMonth == month
             }
             .sortedByDescending { (_, cache) -> effectiveTimestamp(cache) }
-            .map { (path, cache) -> createMediaItemFromMediaStore(File(path), cache) }
+            .mapNotNull { (path, cache) ->
+                val file = File(path)
+                val canonicalPath = canonicalMediaPath(file)
+                if (!seenPaths.add(canonicalPath)) return@mapNotNull null
+                if (!isDisplayableMediaFile(
+                        file = file,
+                        isVideo = cache.isVideo,
+                        cachedWidth = cache.width,
+                        cachedHeight = cache.height,
+                    )
+                ) {
+                    return@mapNotNull null
+                }
+                createMediaItemFromMediaStore(file, cache)
+            }
         emit(items)
     }.flowOn(Dispatchers.IO)
 

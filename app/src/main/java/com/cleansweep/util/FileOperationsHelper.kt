@@ -51,6 +51,7 @@ class FileOperationsHelper @Inject constructor(
      */
     suspend fun filterExistingFiles(changes: List<PendingChange>): List<PendingChange> = withContext(Dispatchers.IO) {
         changes.filter { change ->
+            if (change.item.isExcludedFromInventory()) return@filter false
             try {
                 mediaItemExists(change.item)
             } catch (e: SecurityException) {

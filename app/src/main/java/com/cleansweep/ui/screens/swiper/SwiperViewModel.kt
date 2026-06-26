@@ -53,6 +53,7 @@ import com.cleansweep.ui.components.FolderSearchManager
 import com.cleansweep.ui.theme.AppTheme
 import com.cleansweep.util.CoilPreloader
 import com.cleansweep.util.FileOperationsHelper
+import com.cleansweep.util.isExcludedFromInventory
 import com.cleansweep.util.ThumbnailPrewarmer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -254,17 +255,19 @@ class SwiperViewModel @Inject constructor(
         observeDialogSearchQuery()
         val savedChanges: List<PendingChange>? = savedStateHandle["pendingChanges"]
         if (savedChanges != null) {
+            val validChanges = savedChanges.filterNot { it.item.isExcludedFromInventory() }
             _uiState.update { currentState ->
-                val summary = processSummaryLists(savedChanges, currentState.folderIdToNameMap)
+                val summary = processSummaryLists(validChanges, currentState.folderIdToNameMap)
                 currentState.copy(
-                    pendingChanges = savedChanges,
+                    pendingChanges = validChanges,
                     toDelete = summary.toDelete,
                     toKeep = summary.toKeep,
                     toConvert = summary.toConvert,
                     groupedMoves = summary.groupedMoves,
-                    reversibleActions = savedChanges.map { ReversibleAction.Decision(it) }
+                    reversibleActions = validChanges.map { ReversibleAction.Decision(it) }
                 )
             }
+            savedStateHandle["pendingChanges"] = if (validChanges.isNotEmpty()) ArrayList(validChanges) else null
         }
     }
 
@@ -568,7 +571,14 @@ class SwiperViewModel @Inject constructor(
                             }
                         }
 
-                        allItems.addAll(newBatch)
+                        if (newBatch.isNotEmpty()) {
+                            val seenIds = allItems.asSequence().map { it.id }.toMutableSet()
+                            newBatch.forEach { item ->
+                                if (!item.isExcludedFromInventory() && seenIds.add(item.id)) {
+                                    allItems.add(item)
+                                }
+                            }
+                        }
                         val restoredDeletePoolChanges = newBatch
                             .filter { it.mediaKey() in deletePoolMediaKeys }
                             .map { PendingChange(it, SwiperAction.Delete(it)) }
