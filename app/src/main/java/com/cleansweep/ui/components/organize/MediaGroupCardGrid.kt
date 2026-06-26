@@ -23,9 +23,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -64,31 +61,25 @@ fun MonthGroupCardGrid(
             }
 
             item(key = "grid-${section.year}") {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    userScrollEnabled = false,
-                ) {
-                    items(section.months, key = { "${it.year}-${it.month}" }) { month ->
-                        val monthLabel = Month.of(month.month)
-                            .getDisplayName(TextStyle.SHORT_STANDALONE, Locale.getDefault())
-                        val subtitle = pluralStringResource(
-                            R.plurals.organize_media_count,
-                            month.itemCount,
-                            month.itemCount,
-                        )
+                FixedColumnCoverCardGrid(
+                    items = section.months,
+                ) { month ->
+                    val monthLabel = Month.of(month.month)
+                        .getDisplayName(TextStyle.SHORT_STANDALONE, Locale.getDefault())
+                    val subtitle = pluralStringResource(
+                        R.plurals.organize_media_count,
+                        month.itemCount,
+                        month.itemCount,
+                    )
 
-                        MediaCoverCard(
-                            title = monthLabel,
-                            subtitle = subtitle,
-                            coverUri = month.coverMedia?.uri,
-                            isVideo = month.coverMedia?.isVideo == true,
-                            isSelected = false,
-                            onClick = { onMonthClick(month) },
-                        )
-                    }
+                    MediaCoverCard(
+                        title = monthLabel,
+                        subtitle = subtitle,
+                        coverUri = month.coverMedia?.uri,
+                        isVideo = month.coverMedia?.isVideo == true,
+                        isSelected = false,
+                        onClick = { onMonthClick(month) },
+                    )
                 }
             }
         }

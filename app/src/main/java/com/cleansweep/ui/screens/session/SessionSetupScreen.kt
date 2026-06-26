@@ -31,9 +31,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
@@ -69,6 +66,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.cleansweep.R
 import com.cleansweep.data.repository.OrganizeViewMode
 import com.cleansweep.domain.model.FolderDetails
+import com.cleansweep.ui.components.organize.FixedColumnCoverCardGrid
 import com.cleansweep.ui.components.organize.MediaCoverCard
 import com.cleansweep.ui.components.AppDialog
 import com.cleansweep.ui.components.AppDropdownMenu
@@ -445,22 +443,16 @@ fun SessionSetupScreen(
                                                 )
                                             }
                                             item(key = "grid-${category.name}") {
-                                                LazyVerticalGrid(
-                                                    columns = GridCells.Fixed(3),
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                                                    userScrollEnabled = false,
-                                                ) {
-                                                    items(category.folders, key = { it.path }) { folder ->
-                                                        FolderCoverCardItem(
-                                                            folder = folder,
-                                                            uiState = uiState,
-                                                            coverMediaByFolder = coverMediaByFolder,
-                                                            onToggle = { viewModel.toggleFolderSelection(folder.path) },
-                                                            onLongPress = { viewModel.enterContextualSelectionMode(folder.path) },
-                                                        )
-                                                    }
+                                                FixedColumnCoverCardGrid(
+                                                    items = category.folders,
+                                                ) { folder ->
+                                                    FolderCoverCardItem(
+                                                        folder = folder,
+                                                        uiState = uiState,
+                                                        coverMediaByFolder = coverMediaByFolder,
+                                                        onToggle = { viewModel.toggleFolderSelection(folder.path) },
+                                                        onLongPress = { viewModel.enterContextualSelectionMode(folder.path) },
+                                                    )
                                                 }
                                             }
                                         }

@@ -388,7 +388,7 @@ class DirectMediaRepositoryImpl @Inject constructor(
                 val widthColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.WIDTH)
                 val heightColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.HEIGHT)
                 val orientationColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.ORIENTATION)
-                val dateTakenColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_TAKEN)
+                val dateTakenColumn = cursor.getColumnIndex(MediaStore.MediaColumns.DATE_TAKEN)
 
                 while (cursor.moveToNext()) {
                     val path = cursor.getString(dataColumn)
@@ -399,7 +399,7 @@ class DirectMediaRepositoryImpl @Inject constructor(
                             mimeType = cursor.getString(mimeColumn),
                             dateAdded = cursor.getLong(dateAddedColumn),
                             dateModified = cursor.getLong(dateModifiedColumn),
-                            dateTaken = cursor.getLong(dateTakenColumn),
+                            dateTaken = if (dateTakenColumn >= 0) cursor.getLong(dateTakenColumn) else 0L,
                             size = cursor.getLong(sizeColumn),
                             bucketId = cursor.getString(bucketIdColumn),
                             bucketName = cursor.getString(bucketNameColumn),
