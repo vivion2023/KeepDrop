@@ -50,3 +50,16 @@ internal fun effectivePendingItemIdsAtPosition(
         if (isPermanentHide || itemIndex <= currentIndex) itemId else null
     }.toSet()
 }
+
+/** Remaining items in the swiper queue after pending deletes are excluded. */
+internal fun visibleQueueTotal(listSize: Int, hiddenIndices: Set<Int>): Int =
+    (listSize - hiddenIndices.size).coerceAtLeast(1)
+
+/** 1-based position of [currentIndex] among non-deleted items in the queue. */
+internal fun visibleQueuePosition(currentIndex: Int, hiddenIndices: Set<Int>): Int {
+    var position = 0
+    for (i in 0..currentIndex) {
+        if (i !in hiddenIndices) position++
+    }
+    return position.coerceAtLeast(1)
+}

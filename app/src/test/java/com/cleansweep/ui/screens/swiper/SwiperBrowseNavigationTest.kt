@@ -79,4 +79,19 @@ class SwiperBrowseNavigationTest {
             effectivePendingItemIdsAtPosition(entries, currentIndex = 2)
         )
     }
+
+    @Test
+    fun visibleQueueTotal_subtractsPendingDeletes() {
+        assertEquals(36, visibleQueueTotal(listSize = 37, hiddenIndices = setOf(1)))
+    }
+
+    @Test
+    fun visibleQueuePosition_renumbersAfterDeleteAtSecondSlot() {
+        assertEquals(2, visibleQueuePosition(currentIndex = 2, hiddenIndices = setOf(1)))
+    }
+
+    @Test
+    fun visibleQueuePosition_firstVisibleAfterLeadingDeletes() {
+        assertEquals(1, visibleQueuePosition(currentIndex = 2, hiddenIndices = setOf(0, 1)))
+    }
 }

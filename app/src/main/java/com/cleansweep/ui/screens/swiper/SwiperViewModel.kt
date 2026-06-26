@@ -879,6 +879,20 @@ class SwiperViewModel @Inject constructor(
             .take(limit)
     }
 
+    /** 1-based counter position among items still visible in the organize queue. */
+    fun visibleQueuePosition(): Int {
+        val state = _uiState.value
+        val hidden = pendingDeleteIndices(state.pendingChanges, state.allMediaItems)
+        return visibleQueuePosition(state.currentIndex, hidden)
+    }
+
+    /** Total items remaining in the organize queue (excludes pending deletes). */
+    fun visibleQueueTotal(): Int {
+        val state = _uiState.value
+        val hidden = pendingDeleteIndices(state.pendingChanges, state.allMediaItems)
+        return visibleQueueTotal(state.allMediaItems.size, hidden)
+    }
+
     fun getPreviousBrowsableItem(): MediaItem? {
         return getAdjacentItemsForBrowse(direction = -1, limit = 1).firstOrNull()
     }

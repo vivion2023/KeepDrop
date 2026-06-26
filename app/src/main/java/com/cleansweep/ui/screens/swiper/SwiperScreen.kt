@@ -422,8 +422,8 @@ fun SwiperScreen(
                         val currentItem = uiState.currentItem!!
                         OrganizePhoneLayout(
                             currentItem = currentItem,
-                            currentIndex = uiState.currentIndex,
-                            totalCount = uiState.allMediaItems.size,
+                            currentIndex = viewModel.visibleQueuePosition() - 1,
+                            totalCount = viewModel.visibleQueueTotal(),
                             deletePoolCount = uiState.toDelete.size,
                             targetFolders = uiState.targetFolders,
                             targetFavorites = uiState.targetFavorites,
