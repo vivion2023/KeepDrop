@@ -36,3 +36,17 @@ internal fun adjacentBrowsableIndexFiltered(
     }
     return range.firstOrNull { it !in hiddenIndices }
 }
+
+/**
+ * Pending item IDs that count as processed when advancing from [currentIndex].
+ * Deletes are always excluded (even after browse-back); other decisions only apply
+ * at or before the current view position so kept items ahead can be revisited.
+ */
+internal fun effectivePendingItemIdsAtPosition(
+    entries: List<Triple<String, Int, Boolean>>,
+    currentIndex: Int
+): Set<String> {
+    return entries.mapNotNull { (itemId, itemIndex, isPermanentHide) ->
+        if (isPermanentHide || itemIndex <= currentIndex) itemId else null
+    }.toSet()
+}

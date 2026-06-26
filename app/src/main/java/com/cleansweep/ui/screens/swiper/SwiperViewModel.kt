@@ -795,9 +795,12 @@ class SwiperViewModel @Inject constructor(
         }
     }
 
+    private fun isPermanentHideAction(action: SwiperAction): Boolean =
+        action is SwiperAction.Delete || action is SwiperAction.ScreenshotAndDelete
+
     private fun pendingDeleteIndices(pendingChanges: List<PendingChange>, allMediaItems: List<MediaItem>): Set<Int> {
         val deleteIds = pendingChanges
-            .filter { it.action is SwiperAction.Delete }
+            .filter { isPermanentHideAction(it.action) }
             .map { it.item.id }
             .toSet()
         if (deleteIds.isEmpty()) return emptySet()
@@ -806,9 +809,14 @@ class SwiperViewModel @Inject constructor(
             .toSet()
     }
 
+    private fun isItemPendingPermanentHide(
+        itemId: String,
+        pendingChanges: List<PendingChange>
+    ): Boolean = pendingChanges.any { it.item.id == itemId && isPermanentHideAction(it.action) }
+
     /**
-     * Only pending decisions at or before the current view position count as processed.
-     * Allows advancing to "previously kept" items when at a browsed-back position.
+     * Pending decisions at or before [currentIndex] count as processed for Keep/Move/etc.
+     * Pending deletes always count as processed so browse-back cannot resurface them on advance.
      */
     private fun processedIdsForAdvance(
         pendingChanges: List<PendingChange>,
@@ -816,13 +824,15 @@ class SwiperViewModel @Inject constructor(
         skippedIds: Set<String>
     ): Set<String> {
         val allMediaItems = _uiState.value.allMediaItems
-        val effectivePending = pendingChanges.filter { ch ->
-            val idx = allMediaItems.indexOfFirst { it.id == ch.item.id }
-            idx != -1 && idx <= currentIndex
+        val pendingEntries = pendingChanges.mapNotNull { change ->
+            val idx = allMediaItems.indexOfFirst { it.id == change.item.id }
+            if (idx == -1) return@mapNotNull null
+            Triple(change.item.id, idx, isPermanentHideAction(change.action))
         }
+        val effectivePendingIds = effectivePendingItemIdsAtPosition(pendingEntries, currentIndex)
         return sessionProcessedMediaIds +
                 (if (_rememberProcessedMediaEnabled) processedMediaIds else emptySet()) +
-                effectivePending.map { it.item.id }.toSet() +
+                effectivePendingIds +
                 skippedIds
     }
 
@@ -937,7 +947,9 @@ class SwiperViewModel @Inject constructor(
     }
 
     fun handleDelete() {
-        val currentItem = _uiState.value.currentItem ?: return
+        val state = _uiState.value
+        val currentItem = state.currentItem ?: return
+        if (isItemPendingPermanentHide(currentItem.id, state.pendingChanges)) return
         val change = PendingChange(currentItem, SwiperAction.Delete(currentItem))
         deletePoolMediaKeys = deletePoolMediaKeys + currentItem.mediaKey()
         processAndAdvance(change)
@@ -1681,7 +1693,18 @@ class SwiperViewModel @Inject constructor(
         _uiState.update { it.copy(reversibleActions = state.reversibleActions.dropLast(1)) }
         when (last) {
             is ReversibleAction.BrowseBack -> {
-                val target = last.forwardIndex
+                val browseState = _uiState.value
+                val hiddenIndices = pendingDeleteIndices(browseState.pendingChanges, browseState.allMediaItems)
+                val target = if (last.forwardIndex !in hiddenIndices) {
+                    last.forwardIndex
+                } else {
+                    adjacentBrowsableIndexFiltered(
+                        currentIndex = last.forwardIndex,
+                        direction = 1,
+                        listSize = browseState.allMediaItems.size,
+                        hiddenIndices = hiddenIndices
+                    ) ?: last.forwardIndex
+                }
                 _uiState.update {
                     it.copy(
                         currentIndex = target,

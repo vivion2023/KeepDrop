@@ -52,4 +52,31 @@ class SwiperBrowseNavigationTest {
             )
         )
     }
+
+    @Test
+    fun effectivePending_afterBrowseBack_keepsDeletesButNotAheadKeeps() {
+        val entries = listOf(
+            Triple("keep-0", 0, false),
+            Triple("delete-1", 1, true),
+            Triple("delete-2", 2, true),
+            Triple("keep-3", 3, false),
+        )
+        assertEquals(
+            setOf("keep-0", "delete-1", "delete-2"),
+            effectivePendingItemIdsAtPosition(entries, currentIndex = 0)
+        )
+    }
+
+    @Test
+    fun effectivePending_atCurrentIndex_includesAllDecisionsUpToPosition() {
+        val entries = listOf(
+            Triple("keep-0", 0, false),
+            Triple("delete-1", 1, true),
+            Triple("keep-2", 2, false),
+        )
+        assertEquals(
+            setOf("keep-0", "delete-1", "keep-2"),
+            effectivePendingItemIdsAtPosition(entries, currentIndex = 2)
+        )
+    }
 }
