@@ -465,6 +465,18 @@ fun SwiperScreen(
                         )
                     }
                 }
+                uiState.isSortingComplete && uiState.pendingChanges.isNotEmpty() -> {
+                    NoMoreItemsMessage(
+                        pendingChanges = uiState.pendingChanges,
+                        onShowSummarySheet = viewModel::showSummarySheet
+                    )
+                }
+                uiState.isSortingComplete && uiState.pendingChanges.isNotEmpty() -> {
+                    NoMoreItemsMessage(
+                        pendingChanges = uiState.pendingChanges,
+                        onShowSummarySheet = viewModel::showSummarySheet
+                    )
+                }
                 uiState.isSortingComplete && uiState.pendingChanges.isEmpty() -> {
                     val rememberProcessedMedia by viewModel.rememberProcessedMedia.collectAsState()
                     AlreadyOrganizedDialog(
@@ -478,10 +490,14 @@ fun SwiperScreen(
                     )
                 }
                 else -> {
-                    NoMoreItemsMessage(
-                        pendingChanges = uiState.pendingChanges,
-                        onShowSummarySheet = viewModel::showSummarySheet
-                    )
+                    if (uiState.pendingChanges.isNotEmpty()) {
+                        NoMoreItemsMessage(
+                            pendingChanges = uiState.pendingChanges,
+                            onShowSummarySheet = viewModel::showSummarySheet
+                        )
+                    } else {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    }
                 }
             }
             if (uiState.showAddTargetFolderDialog) {

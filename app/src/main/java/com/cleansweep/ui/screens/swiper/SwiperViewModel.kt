@@ -717,82 +717,77 @@ class SwiperViewModel @Inject constructor(
 
     private fun processAndAdvance(change: PendingChange? = null, skipCurrent: Boolean = false) {
         change?.let { coilPreloader.preload(listOf(it.item)) }
-        prewarmNextImages()
 
-        viewModelScope.launch {
-            _uiState.update { currentState ->
-                val itemToProcess = currentState.currentItem ?: return@update currentState
+        _uiState.update { currentState ->
+            val itemToProcess = currentState.currentItem ?: return@update currentState
 
-                // Step 1: Determine new lists of changes and skips
-                val newPendingChanges = if (change != null) {
-                    currentState.pendingChanges + change
-                } else {
-                    currentState.pendingChanges
-                }
-                val newSkippedIds = if (skipCurrent) {
-                    currentState.sessionSkippedMediaIds + itemToProcess.id
-                } else {
-                    currentState.sessionSkippedMediaIds
-                }
-
-                val newReversibleActions = if (change != null) {
-                    currentState.reversibleActions + ReversibleAction.Decision(change)
-                } else {
-                    currentState.reversibleActions
-                }
-
-                savedStateHandle["pendingChanges"] = if (newPendingChanges.isNotEmpty()) ArrayList(newPendingChanges) else null
-
-                // Step 2: Find the next item to display
-                val allProcessedIds = processedIdsForAdvance(
-                    pendingChanges = newPendingChanges,
-                    currentIndex = currentState.currentIndex,
-                    skippedIds = newSkippedIds
-                )
-
-                val nextIndexInList = currentState.allMediaItems
-                    .drop(currentState.currentIndex + 1)
-                    .indexOfFirst { it.id !in allProcessedIds }
-
-                val nextItem: MediaItem?
-                val nextIndex: Int
-                val isSortingComplete: Boolean
-
-                if (nextIndexInList != -1) {
-                    val actualIndex = currentState.currentIndex + 1 + nextIndexInList
-                    nextIndex = actualIndex
-                    nextItem = currentState.allMediaItems.getOrNull(actualIndex)
-                    isSortingComplete = nextItem == null
-                } else {
-                    nextIndex = currentState.currentIndex // Keep index, but item becomes null
-                    nextItem = null
-                    isSortingComplete = true
-                }
-
-                // Step 3: Recalculate summary lists
-                val summary = processSummaryLists(newPendingChanges, currentState.folderIdToNameMap)
-
-                // Step 4: Return the new, fully-formed state
-                currentState.copy(
-                    pendingChanges = newPendingChanges,
-                    sessionSkippedMediaIds = newSkippedIds,
-                    reversibleActions = newReversibleActions,
-                    currentIndex = nextIndex,
-                    currentItem = nextItem,
-                    isSortingComplete = isSortingComplete,
-                    showSummarySheet = isSortingComplete && newPendingChanges.isNotEmpty(),
-                    videoPlaybackPosition = 0L,
-                    videoPlaybackSpeed = _defaultVideoSpeed,
-                    isVideoMuted = true,
-                    isCurrentItemPendingConversion = false,
-                    toDelete = summary.toDelete,
-                    toKeep = summary.toKeep,
-                    toConvert = summary.toConvert,
-                    groupedMoves = summary.groupedMoves,
-
-                )
+            val newPendingChanges = if (change != null) {
+                currentState.pendingChanges + change
+            } else {
+                currentState.pendingChanges
             }
+            val newSkippedIds = if (skipCurrent) {
+                currentState.sessionSkippedMediaIds + itemToProcess.id
+            } else {
+                currentState.sessionSkippedMediaIds
+            }
+
+            val newReversibleActions = if (change != null) {
+                currentState.reversibleActions + ReversibleAction.Decision(change)
+            } else {
+                currentState.reversibleActions
+            }
+
+            savedStateHandle["pendingChanges"] = if (newPendingChanges.isNotEmpty()) ArrayList(newPendingChanges) else null
+
+            val allProcessedIds = processedIdsForAdvance(
+                pendingChanges = newPendingChanges,
+                currentIndex = currentState.currentIndex,
+                skippedIds = newSkippedIds
+            )
+
+            val nextIndexInList = currentState.allMediaItems
+                .drop(currentState.currentIndex + 1)
+                .indexOfFirst { it.id !in allProcessedIds }
+
+            val nextItem: MediaItem?
+            val nextIndex: Int
+            val isSortingComplete: Boolean
+            val lastListIndex = currentState.allMediaItems.lastIndex
+
+            if (nextIndexInList != -1) {
+                val actualIndex = currentState.currentIndex + 1 + nextIndexInList
+                nextIndex = actualIndex
+                nextItem = currentState.allMediaItems.getOrNull(actualIndex)
+                isSortingComplete = nextItem == null
+            } else {
+                nextIndex = currentState.currentIndex.coerceIn(0, lastListIndex.coerceAtLeast(0))
+                nextItem = null
+                isSortingComplete = true
+            }
+
+            val summary = processSummaryLists(newPendingChanges, currentState.folderIdToNameMap)
+
+            currentState.copy(
+                pendingChanges = newPendingChanges,
+                sessionSkippedMediaIds = newSkippedIds,
+                reversibleActions = newReversibleActions,
+                currentIndex = nextIndex,
+                currentItem = nextItem,
+                isSortingComplete = isSortingComplete,
+                showSummarySheet = isSortingComplete && newPendingChanges.isNotEmpty(),
+                videoPlaybackPosition = 0L,
+                videoPlaybackSpeed = _defaultVideoSpeed,
+                isVideoMuted = true,
+                isCurrentItemPendingConversion = false,
+                toDelete = summary.toDelete,
+                toKeep = summary.toKeep,
+                toConvert = summary.toConvert,
+                groupedMoves = summary.groupedMoves,
+            )
         }
+
+        prewarmNextImages()
     }
 
     private fun isPermanentHideAction(action: SwiperAction): Boolean =
@@ -926,7 +921,7 @@ class SwiperViewModel @Inject constructor(
 
             currentState.copy(
                 currentIndex = targetIndex,
-                currentItem = currentState.allMediaItems[targetIndex],
+                currentItem = currentState.allMediaItems.getOrNull(targetIndex),
                 isSortingComplete = false,
                 showSummarySheet = false,
                 videoPlaybackPosition = 0L,
@@ -1795,7 +1790,7 @@ class SwiperViewModel @Inject constructor(
             // Case 2: The reverted item is a previous item in the swiper list.
             if (restoredItemIndex != -1 && (restoredItemIndex < currentSwiperIndex || currentState.isSortingComplete)) {
                 finalState = finalState.copy(
-                    currentItem = finalState.allMediaItems[restoredItemIndex],
+                    currentItem = finalState.allMediaItems.getOrNull(restoredItemIndex),
                     currentIndex = restoredItemIndex,
                     isSortingComplete = false,
                     error = null,

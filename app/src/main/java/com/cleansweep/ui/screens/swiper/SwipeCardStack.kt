@@ -772,10 +772,12 @@ internal fun SwipeCardStack(
                                             1f,
                                             tween(300, easing = FastOutSlowInEasing)
                                         )
-                                        latestOnSwipeToDeletePool.value()
                                         gesture.deleteFlyProgress.snapTo(0f)
                                         gesture.transitionProgress.snapTo(0f)
                                         gesture.resetAllState(reportDeletePoolProgress)
+                                        // Commit delete only after fly + gesture reset so the last
+                                        // card is not torn down mid-animation (avoids crash at 1/N).
+                                        latestOnSwipeToDeletePool.value()
                                     }
                                 }
                                 gesture.freeDragEnabled -> {
