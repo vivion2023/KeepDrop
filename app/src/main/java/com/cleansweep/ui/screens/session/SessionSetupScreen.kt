@@ -99,14 +99,12 @@ fun SessionSetupScreen(
     val coverMediaByFolder by viewModel.coverMediaByFolder.collectAsState()
     val folderSearchState by viewModel.folderSearchManager.state.collectAsState()
     val scope = rememberCoroutineScope()
-    val focusRequester = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
-    val searchAutofocusEnabled by viewModel.searchAutofocusEnabled.collectAsState()
     val context = LocalContext.current
     val isExpandedScreen = windowSizeClass.widthSizeClass > WindowWidthSizeClass.Compact
     val pullToRefreshState = rememberPullToRefreshState()
     val logTag ="SessionSetupScreen"
+    val directStartOnClick = hideTopBar
     val listBottomPadding = if (hideTopBar) 8.dp else 96.dp
     val emptyStateBottomClearance = if (hideTopBar) 16.dp else 64.dp
 
@@ -114,8 +112,11 @@ fun SessionSetupScreen(
         viewModel.exitContextualSelectionMode()
     }
 
-    BackHandler(enabled = uiState.searchQuery.isNotEmpty() && !uiState.isContextualSelectionMode) {
-        viewModel.updateSearchQuery("")
+    fun startSessionForFolder(folderPath: String) {
+        Log.d(logTag, "Starting session for folder: $folderPath")
+        viewModel.selectBucket(folderPath)
+        viewModel.saveSelectedBucketsPreference()
+        onStartSession(listOf(folderPath))
     }
 
     // Handle toast messages
@@ -194,12 +195,6 @@ fun SessionSetupScreen(
                     }
                 }
             )
-        }
-    }
-
-    LaunchedEffect(searchAutofocusEnabled) {
-        if (searchAutofocusEnabled) {
-            focusRequester.requestFocus()
         }
     }
 
@@ -333,11 +328,6 @@ fun SessionSetupScreen(
         },
         floatingActionButtonPosition = if (isExpandedScreen) FabPosition.End else FabPosition.Center
     ) { paddingValues ->
-        val visibleFolders = uiState.folderCategories.flatMap { it.folders }
-        val areAllVisibleSelected = visibleFolders.isNotEmpty() &&
-            visibleFolders.all { it.path in uiState.selectedBuckets }
-        val isSelectAllMode = !areAllVisibleSelected
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -349,30 +339,41 @@ fun SessionSetupScreen(
                     },
                 ),
         ) {
-            TextField(
-                value = uiState.searchQuery,
-                onValueChange = { viewModel.updateSearchQuery(it) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(if (hideTopBar) Modifier.padding(top = 4.dp) else Modifier)
-                    .focusRequester(focusRequester),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(
-                    onSearch = {
-                        keyboardController?.hide()
-                        focusManager.clearFocus()
+            if (!directStartOnClick) {
+                val focusRequester = remember { FocusRequester() }
+                val keyboardController = LocalSoftwareKeyboardController.current
+                val searchAutofocusEnabled by viewModel.searchAutofocusEnabled.collectAsState()
+
+                LaunchedEffect(searchAutofocusEnabled) {
+                    if (searchAutofocusEnabled) {
+                        focusRequester.requestFocus()
                     }
-                ),
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_hint)) },
-                trailingIcon = if (uiState.searchQuery.isNotEmpty()) {
-                    {
-                        IconButton(onClick = { viewModel.updateSearchQuery("") }) {
-                            Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.clear_search))
+                }
+
+                TextField(
+                    value = uiState.searchQuery,
+                    onValueChange = { viewModel.updateSearchQuery(it) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(
+                        onSearch = {
+                            keyboardController?.hide()
+                            focusManager.clearFocus()
                         }
-                    }
-                } else null
-            )
+                    ),
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_hint)) },
+                    trailingIcon = if (uiState.searchQuery.isNotEmpty()) {
+                        {
+                            IconButton(onClick = { viewModel.updateSearchQuery("") }) {
+                                Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.clear_search))
+                            }
+                        }
+                    } else null
+                )
+            }
             PullToRefreshBox(
                 isRefreshing = uiState.isRefreshing,
                 onRefresh = viewModel::refreshFolders,
@@ -436,7 +437,7 @@ fun SessionSetupScreen(
 
                     // Case 4: Load complete, but the current search query filters them all out.
                     // Only show this if a search is not actively in progress.
-                    uiState.folderCategories.isEmpty() && !uiState.isSearching -> {
+                    !directStartOnClick && uiState.folderCategories.isEmpty() && !uiState.isSearching -> {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
                             item {
                                 NoSearchResultsMessage(
@@ -482,7 +483,14 @@ fun SessionSetupScreen(
                                                         folder = folder,
                                                         uiState = uiState,
                                                         coverMediaByFolder = coverMediaByFolder,
-                                                        onToggle = { viewModel.toggleFolderSelection(folder.path) },
+                                                        directStartOnClick = directStartOnClick,
+                                                        onToggle = {
+                                                            if (directStartOnClick) {
+                                                                startSessionForFolder(folder.path)
+                                                            } else {
+                                                                viewModel.toggleFolderSelection(folder.path)
+                                                            }
+                                                        },
                                                         onLongPress = { viewModel.enterContextualSelectionMode(folder.path) },
                                                     )
                                                 }
@@ -517,19 +525,26 @@ fun SessionSetupScreen(
                                                 val isSelectedForContext = folder.path in uiState.contextSelectedFolderPaths
                                                 EnhancedFolderItem(
                                                     folder = folder,
-                                                    isSelected = if (uiState.isContextualSelectionMode) isSelectedForContext else isSelectedForSession,
+                                                    isSelected = if (uiState.isContextualSelectionMode) {
+                                                        isSelectedForContext
+                                                    } else if (directStartOnClick) {
+                                                        false
+                                                    } else {
+                                                        isSelectedForSession
+                                                    },
                                                     isContextualMode = uiState.isContextualSelectionMode,
+                                                    showSelectionCheckbox = !directStartOnClick,
                                                     isFavorite = folder.path in uiState.favoriteFolders,
                                                     isRecursiveRoot = folder.path in uiState.recursivelySelectedRoots,
                                                     onToggle = {
                                                         if (uiState.isContextualSelectionMode) {
                                                             viewModel.toggleContextualSelection(folder.path)
+                                                        } else if (directStartOnClick) {
+                                                            startSessionForFolder(folder.path)
+                                                        } else if (isSelectedForSession) {
+                                                            viewModel.unselectBucket(folder.path)
                                                         } else {
-                                                            if (isSelectedForSession) {
-                                                                viewModel.unselectBucket(folder.path)
-                                                            } else {
-                                                                viewModel.selectBucket(folder.path)
-                                                            }
+                                                            viewModel.selectBucket(folder.path)
                                                         }
                                                     },
                                                     onLongPress = {
@@ -556,78 +571,6 @@ fun SessionSetupScreen(
                 }
             }
 
-            if (hideTopBar && !uiState.isContextualSelectionMode) {
-                SessionSelectionActionBar(
-                    isSelectAllMode = isSelectAllMode,
-                    hasSelection = uiState.selectedBuckets.isNotEmpty(),
-                    onSelectAllToggle = {
-                        if (isSelectAllMode) {
-                            viewModel.selectAll()
-                        } else {
-                            viewModel.unselectAll()
-                        }
-                    },
-                    onStartSession = {
-                        if (uiState.selectedBuckets.isNotEmpty()) {
-                            viewModel.saveSelectedBucketsPreference()
-                            onStartSession(uiState.selectedBuckets)
-                        }
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SessionSelectionActionBar(
-    isSelectAllMode: Boolean,
-    hasSelection: Boolean,
-    onSelectAllToggle: () -> Unit,
-    onStartSession: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        ExtendedFloatingActionButton(
-            onClick = onSelectAllToggle,
-            modifier = Modifier.weight(1f),
-            containerColor = MaterialTheme.colorScheme.secondary,
-            contentColor = MaterialTheme.colorScheme.onSecondary,
-        ) {
-            Icon(
-                imageVector = if (isSelectAllMode) Icons.Default.CheckBoxOutlineBlank else Icons.Default.CheckBox,
-                contentDescription = null,
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                if (isSelectAllMode) {
-                    stringResource(R.string.select_all)
-                } else {
-                    stringResource(R.string.unselect_all)
-                },
-            )
-        }
-        ExtendedFloatingActionButton(
-            onClick = onStartSession,
-            modifier = Modifier.weight(1f),
-            containerColor = if (hasSelection) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant
-            },
-            contentColor = if (hasSelection) {
-                MaterialTheme.colorScheme.onPrimary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        ) {
-            Icon(Icons.Default.Check, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(stringResource(R.string.start_session))
         }
     }
 }
@@ -883,6 +826,7 @@ private fun EnhancedFolderItem(
     folder: FolderDetails,
     isSelected: Boolean,
     isContextualMode: Boolean,
+    showSelectionCheckbox: Boolean = true,
     isFavorite: Boolean,
     isRecursiveRoot: Boolean,
     onToggle: () -> Unit,
@@ -1040,10 +984,12 @@ private fun EnhancedFolderItem(
                 }
             }
 
-            Checkbox(
-                checked = isSelected,
-                onCheckedChange = { onToggle() }
-            )
+            if (showSelectionCheckbox) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onToggle() }
+                )
+            }
         }
     }
 }
@@ -1061,12 +1007,17 @@ private fun FolderCoverCardItem(
     folder: FolderDetails,
     uiState: SessionSetupUiState,
     coverMediaByFolder: Map<String, com.cleansweep.data.model.MediaItem?>,
+    directStartOnClick: Boolean,
     onToggle: () -> Unit,
     onLongPress: () -> Unit,
 ) {
     val isSelectedForSession = folder.path in uiState.selectedBuckets
     val isSelectedForContext = folder.path in uiState.contextSelectedFolderPaths
-    val isSelected = if (uiState.isContextualSelectionMode) isSelectedForContext else isSelectedForSession
+    val isSelected = when {
+        uiState.isContextualSelectionMode -> isSelectedForContext
+        directStartOnClick -> false
+        else -> isSelectedForSession
+    }
     val coverMedia = coverMediaByFolder[folder.path]
     val subtitle = pluralStringResource(
         R.plurals.organize_media_count,
