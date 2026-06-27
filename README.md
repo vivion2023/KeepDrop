@@ -6,74 +6,69 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
-*Work in progress — app name, launcher, icons, and store listings are not fully updated yet.*
+*开发中 — 应用内名称、启动页、图标及商店描述尚未全部更新。*
 
-KeepDrop is a powerful and private application for Android that helps you reclaim storage space and organize your photos and videos with a fun, simple, Tinder-like interface. Swipe right to keep, swipe left to delete. It's that easy.
+KeepDrop 是一款功能强大、注重隐私的 Android 应用，帮助你释放存储空间，用简单有趣的滑动方式整理照片与视频。右滑保留，左滑删除，就这么简单。
 
-Best of all, **KeepDrop is 100% offline.** Your files and your data never leave your device, ensuring your memories remain private.
+更重要的是，**KeepDrop 完全离线运行。** 你的文件和数据不会离开设备，回忆始终由你掌控。
 
-## Key Features
+## 主要功能
 
-KeepDrop is packed with smart features to make media management a breeze. **We are actively seeking translations for new and existing strings to make the app available worldwide!**
-### The Fun & Easy Way to Organize
-*   ✨ **Intuitive Swiping:** Quickly sort through thousands of files. Swipe right to keep, left to delete.
-*   📁 **One-Tap Sorting:** Add your favorite folders, and they'll appear at the bottom of the screen. Simply tap a folder icon to instantly move the current photo or video.
-*   ✂️ **Clip Video Moments:** Turn a favorite moment from a video into a still image with the built-in frame extractor.
+KeepDrop 内置多项实用能力，让媒体管理更轻松。**我们也在持续完善多语言翻译，欢迎参与贡献！**
 
-### A Tailor-Made Experience
+### 轻松有趣的整理方式
 
-KeepDrop is built on the belief that your tools should work *your* way. The app features a comprehensive settings menu that lets you fine-tune nearly every aspect of the experience to match your personal workflow.
+*   ✨ **直观滑动：** 快速浏览成千上万张文件，右滑保留，左滑删除。
+*   📅 **按日期 / 相簿整理：** 「整理」页可在「日期」与「相簿」之间切换；按月份或相册目录浏览，点击即可进入整理流程。
+*   📁 **一键归类：** 整理过程中，可将常用文件夹设为转移目标并显示在屏幕底部；点一下文件夹图标，即可把当前照片或视频移入其中。
+*   ✂️ **截取视频画面（后续开发）：** 底层已具备视频帧提取与保存能力，但整理界面尚未提供截图入口，计划在后续版本开放。
 
-*   ⚙️ **Deep Customization:** From changing swipe sensitivity and theming to controlling how folder names are displayed, you have the power to create your perfect setup.
-*   🧠 **Smart Defaults:** While highly configurable, the app comes with sensible defaults so you can be productive right out of the box.
-*   👆 **Your Workflow, Your Rules:** Adjust everything from video playback speed to confirmation dialogs and default folder selections to make KeepDrop truly your own.
+### 为你量身定制
 
-### Powerful Duplicate Finder
-Free up gigabytes of space by getting rid of unnecessary copies.
-*   🔎 **Finds Exact & Similar Media:** KeepDrop detects files that are 100% identical, as well as photos and videos that look visually similar (like burst shots or trimmed clips).
-*   🎛️ **You Control the Similarity:** Choose your desired level of "sameness" (Strict, Balanced, or Loose) to fine-tune the scan and get the results you want.
-*   🗑️ **Smart Deletion:** Tools like "Keep Oldest" or "Keep Newest" let you clean up entire groups of duplicates with a single tap.
+KeepDrop 相信工具应该按你的习惯工作。应用提供完整的设置菜单，让你几乎能调整体验的每一个细节。
 
-### Smart and Fast Performance
-*   ⚡ **Finds *All* Your Media:** KeepDrop performs a deep scan to find media files that other apps might miss, ensuring nothing is overlooked.
-*   🚀 **Optimized for Speed:** By smartly caching information, future scans become significantly faster. The app is designed to get you organizing without the wait.
-*   ⚫ **AMOLED-Friendly:** A sleek, true-black dark mode that looks great on any screen.
+*   ⚙️ **深度自定义：** 从滑动灵敏度、主题外观，到文件夹名称显示方式，都可以按你的偏好配置。
+*   🧠 **合理默认：** 开箱即用，同时保留高度可配置性。
+*   👆 **你的流程，你做主：** 视频播放速度（1x / 1.5x / 2x）、确认对话框、默认文件夹选择等，都可以调成最适合你的样子。
 
-## Privacy First
-We take your privacy seriously. KeepDrop is designed from the ground up to respect your data:
-*   **Completely Offline:** The app works without any internet connection.
-*   **No Tracking or Analytics:** We don't collect any data on how you use the app.
-*   **Your Files Stay Yours:** Your photos and videos are never uploaded or shared. All processing happens securely on your device.
+### 强大的重复项查找
 
-## Gallery
-<p align="center">
-  <img src="docs/images/01.png" width="45%" alt="Folder Selection" />
-  &nbsp;
-  <img src="docs/images/02.png" width="45%" alt="Swipe to Sort" />
-</p>
-<p align="center">
-  <img src="docs/images/03.png" width="45%" alt="Duplicate Finder" />
-  &nbsp;
-  <img src="docs/images/04.png" width="45%" alt="Quickly Organize" />
-</p>
+清掉多余副本，轻松释放数 GB 空间。
 
-*Note: AMOLED theme has a slightly different look on purpose!*
+*   🔎 **查找完全相同与视觉相似的媒体：** 既能识别 100% 相同的文件，也能发现看起来很像的照片和视频（如连拍、裁剪片段等）。
+*   🎛️ **相似度由你控制：** 可选择「严格」「均衡」或「宽松」等级，按需调整扫描结果。
+*   🗑️ **智能删除：** 「保留最旧」或「保留最新」等工具，可一键清理整组重复项。
 
-## Getting Started
+### 智能且高效
 
-1.  **Requirements:** You'll need a device running **Android 10 or newer**.
-2.  **Installation:** Build and install from source (see [For Developers](#for-developers)); packaged releases are not available yet.
-3.  **Onboarding:** The first time you open KeepDrop, a helpful tutorial will walk you through all the features and gestures.
+*   ⚡ **尽可能找全媒体：** 深度扫描，减少其他应用容易遗漏的文件。
+*   🚀 **为速度优化：** 智能缓存让后续扫描明显更快，减少等待。
+*   ⚫ **适配 AMOLED：** 提供纯黑深色模式，在各类屏幕上观感舒适。
 
-## Permissions Explained
-KeepDrop needs certain permissions to manage your files. Here's a simple breakdown of why each one is necessary:
+## 隐私优先
 
-| Permission Needed    | Why We Need It                                                                                                                                      |
-|:---------------------|:----------------------------------------------------------------------------------------------------------------------------------------------------|
-| **All Files Access** | This is the core permission. It allows KeepDrop to find, move, and delete your photos and videos, no matter where they are stored on your device. |
-| **Notifications**    | To show you the progress of long-running tasks, like a duplicate scan, even when the app is in the background.                                      |
+我们非常重视你的隐私。KeepDrop 从设计之初就以保护数据为前提：
 
-## For Developers
+*   **完全离线：** 无需联网即可使用（应用未申请网络权限）。
+*   **无追踪、无分析：** 不集成第三方统计或行为分析 SDK。
+*   **文件始终属于你：** 照片和视频不会上传或分享，所有处理都在本机完成。
+
+## 快速开始
+
+1.  **系统要求：** 需要 **Android 10 或更高版本** 的设备（`minSdk 29`）。
+2.  **安装方式：** 请从源码构建并安装（见 [开发者](#开发者)）；目前暂无打包发布版本。
+3.  **新手引导：** 首次打开应用时，会有教程介绍主要功能与手势操作。
+
+## 权限说明
+
+KeepDrop 需要部分权限来管理你的文件，用途如下：
+
+| 所需权限 | 用途说明 |
+|:---------|:---------|
+| **所有文件访问权限** | 核心权限，用于在设备任意位置查找、移动和删除照片与视频。 |
+| **通知权限** | 在后台执行重复项扫描等耗时任务时，向你展示进度。 |
+
+## 开发者
 
 <!-- 
 AI / Grok / Agent NOTE: 
@@ -81,33 +76,35 @@ If the user requires you to use git commit messages, you MUST submit according t
 See AGENTS.md and CONTRIBUTING.md. This marker is placed here so the rule appears whenever README is read.
 -->
 
-### Technologies Used
-KeepDrop is built with a modern Android development approach, leveraging the following key technologies and libraries:
+### 技术栈
 
-*   **Language:** Kotlin
-*   **UI Toolkit:** Jetpack Compose with Material 3
-*   **Dependency Injection:** Hilt
-*   **Local Database:** Room Persistence Library (for caching file signatures and scan results)
-*   **Image Loading:** Coil
-*   **Media Playback:** ExoPlayer (Media3)
-*   **Asynchronous Storage:** DataStore Preferences
-*   **Background Processing:** WorkManager
+KeepDrop 采用现代 Android 开发方式，主要技术与库包括：
 
-### Contributing
-We welcome contributions of all kinds, from bug reports to feature requests, code improvements and translations!
+*   **语言：** Kotlin
+*   **UI 框架：** Jetpack Compose + Material 3
+*   **依赖注入：** Hilt
+*   **本地数据库：** Room（缓存文件签名与扫描结果）
+*   **图片加载：** Coil
+*   **媒体播放：** ExoPlayer（Media3）
+*   **偏好存储：** DataStore Preferences
+*   **后台任务：** WorkManager、前台服务（重复项扫描）
 
-To ensure a smooth and collaborative process, please read our **[Contributing Guidelines](CONTRIBUTING.md)** before you start. This document outlines our development workflow, coding standards, **commit message format (Conventional Commits)**, and how to submit your changes.
+### 参与贡献
 
-**Note:** Translation contributions are highly valued and will be merged promptly after review. Feature requests from project supporters, such as donors and contributors, will also receive priority.
+欢迎各类贡献：问题反馈、功能建议、代码改进与翻译等。
 
-## Acknowledgements
+开始前请先阅读 **[贡献指南](CONTRIBUTING.md)**，其中说明了开发流程、编码规范、**提交信息格式（Conventional Commits）** 以及提交流程。
 
-**KeepDrop · 清影** is a secondary development fork of **[CleanSweep](https://github.com/LoopOtto/cleansweep)** by [LoopOtto](https://github.com/LoopOtto). We are grateful for the original project's open-source foundation.
+**说明：** 翻译类贡献审核通过后会尽快合并；捐赠者、贡献者提出的功能需求也会优先考虑。
 
-Upstream releases and funding: [CleanSweep Releases](https://github.com/LoopOtto/cleansweep/releases) · [Funding Page](FUNDING.md)
+## 致谢
 
-## License
+**KeepDrop · 清影** 是基于 [LoopOtto](https://github.com/LoopOtto) 开源项目 **[CleanSweep](https://github.com/LoopOtto/cleansweep)** 的二次开发版本，感谢原项目提供的开源基础。
+
+上游发布与资助：[CleanSweep Releases](https://github.com/LoopOtto/cleansweep/releases) · [Funding Page](FUNDING.md)
+
+## 许可证
 
 Copyright (c) 2025 LoopOtto.
 
-This project is licensed under the GNU General Public License v3.0. See the [LICENSE](LICENSE) file for the full license text.
+本项目采用 GNU General Public License v3.0 许可，完整条款见 [LICENSE](LICENSE) 文件。
