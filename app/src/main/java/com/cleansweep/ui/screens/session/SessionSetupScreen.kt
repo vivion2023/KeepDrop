@@ -69,6 +69,7 @@ import com.cleansweep.data.repository.OrganizeViewMode
 import com.cleansweep.domain.model.FolderDetails
 import com.cleansweep.ui.components.organize.FixedColumnCoverCardGrid
 import com.cleansweep.ui.components.organize.MediaCoverCard
+import com.cleansweep.ui.components.organize.SimpleAlbumListRow
 import com.cleansweep.ui.components.AppDialog
 import com.cleansweep.ui.components.AppDropdownMenu
 import com.cleansweep.ui.components.AppMenuDivider
@@ -452,8 +453,25 @@ fun SessionSetupScreen(
                     // Case 5: Load complete, display the folder list (or the old list while a new search is debouncing).
                     else -> {
                         val listState = rememberLazyListState()
+                        val albumFolders = remember(uiState.folderCategories) {
+                            uiState.folderCategories.flatMap { it.folders }
+                        }
                         Box(modifier = Modifier.fillMaxSize()) {
-                            if (organizeViewMode == OrganizeViewMode.CARD) {
+                            if (directStartOnClick && organizeViewMode == OrganizeViewMode.LIST) {
+                                LazyColumn(
+                                    state = listState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(bottom = listBottomPadding),
+                                ) {
+                                    items(albumFolders, key = { it.path }) { folder ->
+                                        SimpleAlbumListRow(
+                                            title = folder.name,
+                                            itemCount = folder.itemCount,
+                                            onClick = { startSessionForFolder(folder.path) },
+                                        )
+                                    }
+                                }
+                            } else if (organizeViewMode == OrganizeViewMode.CARD) {
                                 LazyColumn(
                                     state = listState,
                                     modifier = Modifier.fillMaxSize(),
@@ -465,34 +483,45 @@ fun SessionSetupScreen(
                                     ),
                                     verticalArrangement = Arrangement.spacedBy(12.dp),
                                 ) {
-                                    uiState.folderCategories.forEach { category ->
-                                        if (category.folders.isNotEmpty()) {
-                                            item(key = "header-${category.name}") {
-                                                Text(
-                                                    text = category.name,
-                                                    style = MaterialTheme.typography.titleMedium,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.padding(vertical = 4.dp),
+                                    if (directStartOnClick) {
+                                        item(key = "album-grid") {
+                                            FixedColumnCoverCardGrid(
+                                                items = albumFolders,
+                                            ) { folder ->
+                                                FolderCoverCardItem(
+                                                    folder = folder,
+                                                    uiState = uiState,
+                                                    coverMediaByFolder = coverMediaByFolder,
+                                                    directStartOnClick = directStartOnClick,
+                                                    onToggle = { startSessionForFolder(folder.path) },
+                                                    onLongPress = { viewModel.enterContextualSelectionMode(folder.path) },
                                                 )
                                             }
-                                            item(key = "grid-${category.name}") {
-                                                FixedColumnCoverCardGrid(
-                                                    items = category.folders,
-                                                ) { folder ->
-                                                    FolderCoverCardItem(
-                                                        folder = folder,
-                                                        uiState = uiState,
-                                                        coverMediaByFolder = coverMediaByFolder,
-                                                        directStartOnClick = directStartOnClick,
-                                                        onToggle = {
-                                                            if (directStartOnClick) {
-                                                                startSessionForFolder(folder.path)
-                                                            } else {
-                                                                viewModel.toggleFolderSelection(folder.path)
-                                                            }
-                                                        },
-                                                        onLongPress = { viewModel.enterContextualSelectionMode(folder.path) },
+                                        }
+                                    } else {
+                                        uiState.folderCategories.forEach { category ->
+                                            if (category.folders.isNotEmpty()) {
+                                                item(key = "header-${category.name}") {
+                                                    Text(
+                                                        text = category.name,
+                                                        style = MaterialTheme.typography.titleMedium,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.padding(vertical = 4.dp),
                                                     )
+                                                }
+                                                item(key = "grid-${category.name}") {
+                                                    FixedColumnCoverCardGrid(
+                                                        items = category.folders,
+                                                    ) { folder ->
+                                                        FolderCoverCardItem(
+                                                            folder = folder,
+                                                            uiState = uiState,
+                                                            coverMediaByFolder = coverMediaByFolder,
+                                                            directStartOnClick = directStartOnClick,
+                                                            onToggle = { viewModel.toggleFolderSelection(folder.path) },
+                                                            onLongPress = { viewModel.enterContextualSelectionMode(folder.path) },
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
@@ -527,20 +556,16 @@ fun SessionSetupScreen(
                                                     folder = folder,
                                                     isSelected = if (uiState.isContextualSelectionMode) {
                                                         isSelectedForContext
-                                                    } else if (directStartOnClick) {
-                                                        false
                                                     } else {
                                                         isSelectedForSession
                                                     },
                                                     isContextualMode = uiState.isContextualSelectionMode,
-                                                    showSelectionCheckbox = !directStartOnClick,
+                                                    showSelectionCheckbox = true,
                                                     isFavorite = folder.path in uiState.favoriteFolders,
                                                     isRecursiveRoot = folder.path in uiState.recursivelySelectedRoots,
                                                     onToggle = {
                                                         if (uiState.isContextualSelectionMode) {
                                                             viewModel.toggleContextualSelection(folder.path)
-                                                        } else if (directStartOnClick) {
-                                                            startSessionForFolder(folder.path)
                                                         } else if (isSelectedForSession) {
                                                             viewModel.unselectBucket(folder.path)
                                                         } else {
